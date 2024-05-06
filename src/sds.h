@@ -80,6 +80,12 @@ struct __attribute__ ((__packed__)) sdshdr64 {
 #define SDS_TYPE_64 4
 #define SDS_TYPE_MASK 7
 #define SDS_TYPE_BITS 3
+/**
+ * 该函数是一个宏定义，用于获取一个SDS（Simple Dynamic String）字符串的头部结构体的指针。
+ * 其中，T表示SDS字符串的类型（如char、short等），s表示SDS字符串的起始地址。
+ * 通过宏定义展开后，代码将sh指针指向SDS字符串起始地址之前sizeof(struct sdshdr##T)大小的内存空间，即SDS头部结构体的起始地址。
+ * 这样就可以通过sh指针操作SDS字符串的头部信息
+ */
 #define SDS_HDR_VAR(T,s) struct sdshdr##T *sh = (void*)((s)-(sizeof(struct sdshdr##T)));
 #define SDS_HDR(T,s) ((struct sdshdr##T *)((s)-(sizeof(struct sdshdr##T))))
 #define SDS_TYPE_5_LEN(f) ((f)>>SDS_TYPE_BITS)

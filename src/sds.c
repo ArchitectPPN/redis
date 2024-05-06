@@ -96,14 +96,34 @@ sds sdsnewlen(const void *init, size_t initlen) {
     int hdrlen = sdsHdrSize(type);
     unsigned char *fp; /* flags pointer. */
 
+    // assert 为断言
+    // hdrlen+initlen+1 超出该类型最大的值时，就会溢出，然后值会变为0，从而小于1，妙啊！
     assert(hdrlen+initlen+1 > initlen); /* Catch size_t overflow */
+    /**
+     * s_malloc函数是Redis源码中使用的内存分配函数，它的作用是请求操作系统分配一定大小的内存。这个函数的接口类似于标准C库中的malloc函数。
+     * 在Redis的源码中，s_malloc函数定义在zmalloc.c文件中。这个函数使用了jemalloc或libc作为内存分配器，具体使用哪个取决于在编译Redis时的配置。
+     * s_malloc函数的返回值是指向新分配的内存块的指针。如果请求的内存大小为0，或者内存分配失败，那么s_malloc函数将返回NULL。
+     * 以下是s_malloc函数的基本使用方法：
+     * void *ptr = s_malloc(size);
+     * 其中，size是需要分配的内存的大小，单位是字节。ptr是一个指向新分配的内存的指针。你可以通过这个指针来访问和操作这块内存。
+     * 注意，使用完这块内存之后，你应该使用s_free函数来释放它，以避免内存泄漏。这是一种良好的内存管理实践。
+     */
     sh = s_malloc(hdrlen+initlen+1);
     if (init==SDS_NOINIT)
         init = NULL;
     else if (!init)
+        /**
+         * memset 是 C 语言中的一个函数，它的主要目的是设置内存区域。函数原型为：
+         * void *memset(void *s, int c, size_t n);
+         * memset 函数会将 s 指向的内存区域的前 n 个字节都设置为 c。这个函数通常用于初始化新分配的内存，例如将新分配的内存设置为0。
+         */
+         // 这里将s_malloc分配的内存初始化为0
         memset(sh, 0, hdrlen+initlen+1);
+    // 内存申请失败，直接返回null
     if (sh == NULL) return NULL;
+    // 该函数将指针sh向后移动hdrlen个字节，并将移动后的指针强制转换为char*类型，然后赋值给s。
     s = (char*)sh+hdrlen;
+    // flags， 该函数将字符串s转换为unsigned char类型的指针，并将其减1，然后将结果赋值给fp。
     fp = ((unsigned char*)s)-1;
     switch(type) {
         case SDS_TYPE_5: {
