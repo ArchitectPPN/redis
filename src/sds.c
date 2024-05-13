@@ -182,23 +182,34 @@ sds sdsnewlen(const void *init, size_t initlen) {
 }
 
 /* Create an empty (zero length) sds string. Even in this case the string
- * always has an implicit null term. */
+ * always has an implicit null term.
+ *
+ * 创建一个空（零长度）的 SDS 字符串。
+ * 即便如此，该字符串始终会有一个隐式的空字符终止符。
+ * */
 sds sdsempty(void) {
     return sdsnewlen("",0);
 }
 
-/* Create a new sds string starting from a null terminated C string. */
+/* Create a new sds string starting from a null terminated C string.
+ * 从一个以空字符终止的 C 风格字符串创建一个新的 SDS 字符串。
+ * */
 sds sdsnew(const char *init) {
     size_t initlen = (init == NULL) ? 0 : strlen(init);
     return sdsnewlen(init, initlen);
 }
 
-/* Duplicate an sds string. */
+/* Duplicate an sds string.
+ * 复制一个sds
+ * */
 sds sdsdup(const sds s) {
     return sdsnewlen(s, sdslen(s));
 }
 
-/* Free an sds string. No operation is performed if 's' is NULL. */
+/*
+ * Free an sds string. No operation is performed if 's' is NULL.
+ * 释放一个sds字符串。如果 's' 为 NULL，则不执行任何操作。
+ * */
 void sdsfree(sds s) {
     if (s == NULL) return;
     /**
@@ -230,7 +241,13 @@ void sdsupdatelen(sds s) {
 /* Modify an sds string in-place to make it empty (zero length).
  * However all the existing buffer is not discarded but set as free space
  * so that next append operations will not require allocations up to the
- * number of bytes previously available. */
+ * number of bytes previously available.
+ * 就地修改一个 SDS 字符串，使其变为空（零长度）。
+ * 但是，现有的缓冲区不会被丢弃，
+ * 而是作为可用空间保留，
+ * 以便接下来的追加操作在不需要新分配内存的情况下，
+ * 可以使用之前可用的字节数。
+ * */
 void sdsclear(sds s) {
     sdssetlen(s, 0);
     s[0] = '\0';
