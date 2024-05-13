@@ -402,6 +402,7 @@ sds sdsRemoveFreeSpace(sds s) {
  */
 size_t sdsAllocSize(sds s) {
     size_t alloc = sdsalloc(s);
+    // 头部空间 + 直接分配空间 + 字符串结束符
     return sdsHdrSize(s[-1])+alloc+1;
 }
 
