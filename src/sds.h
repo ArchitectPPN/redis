@@ -139,6 +139,9 @@ static inline void sdssetlen(sds s, size_t newlen) {
         case SDS_TYPE_5:
             {
                 unsigned char *fp = ((unsigned char*)s)-1;
+                /**
+                 * 重新复制*fp的长度
+                 */
                 *fp = SDS_TYPE_5 | (newlen << SDS_TYPE_BITS);
             }
             break;
