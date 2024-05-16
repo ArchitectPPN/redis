@@ -808,14 +808,22 @@ struct sharedObjectsStruct {
     sds minstring, maxstring;
 };
 
-/* ZSETs use a specialized version of Skiplists */
+/*
+ * ZSETs use a specialized version of Skiplists
+ * ZSETs（有序集合）使用了Skiplists的一个特殊版本
+ **/
 typedef struct zskiplistNode {
+    // 存储了节点的元素值。
     sds ele;
+    // 存储了节点的分值
     double score;
+    // 指向前一个节点的指针
     struct zskiplistNode *backward;
+    // 指向当前节点所在层数的指针
     struct zskiplistLevel {
+        // 存放指向各层链表后一个节点的指针（后向指针）
         struct zskiplistNode *forward;
-        unsigned long span;
+        unsigned long span;// 表示当前的指针跨越了多少个节点
     } level[];
 } zskiplistNode;
 
