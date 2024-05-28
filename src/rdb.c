@@ -2486,9 +2486,13 @@ void saveCommand(client *c) {
 void bgsaveCommand(client *c) {
     int schedule = 0;
 
-    /* The SCHEDULE option changes the behavior of BGSAVE when an AOF rewrite
-     * is in progress. Instead of returning an error a BGSAVE gets scheduled. */
+    /* The SCHEDULE option changes the behavior of BGSAVE when an AOF rewrite is in progress.
+     * SCHEDULE 选项改变了当 AOF 重写正在进行时 BGSAVE 的行为。
+     * Instead of returning an error a BGSAVE gets scheduled.
+     * 而不是返回错误，一个 BGSAVE 会被安排在后台执行。
+     * */
     if (c->argc > 1) {
+        // 参数为2 && 不区分大小写时相等
         if (c->argc == 2 && !strcasecmp(c->argv[1]->ptr,"schedule")) {
             schedule = 1;
         } else {
@@ -2500,21 +2504,31 @@ void bgsaveCommand(client *c) {
     rdbSaveInfo rsi, *rsiptr;
     rsiptr = rdbPopulateSaveInfo(&rsi);
 
+    // 检查是否已经存在一个RDB任务在执行, 如果存在则返回错误
     if (server.rdb_child_pid != -1) {
         addReplyError(c,"Background save already in progress");
     } else if (server.aof_child_pid != -1) {
+        // 判断是否已经有AOF重写子进程在运行
         if (schedule) {
+            // 如果调用方指定了schedule，则将server.rdb_bgsave_scheduled标记为1，
+            // 表示已计划进行RDB保存
             server.rdb_bgsave_scheduled = 1;
+            // 回复状态信息"Background saving scheduled"
             addReplyStatus(c,"Background saving scheduled");
         } else {
+            //如果没有指定schedule，则回复错误信息，表示当前正在进行AOF日志重写，无法进行RDB保存，
+            // 建议使用"BGSAVE SCHEDULE"命令来安排尽可能进行的RDB保存。
             addReplyError(c,
                 "An AOF log rewriting in progress: can't BGSAVE right now. "
                 "Use BGSAVE SCHEDULE in order to schedule a BGSAVE whenever "
                 "possible.");
         }
     } else if (rdbSaveBackground(server.rdb_filename,rsiptr) == C_OK) {
+        // 如果以上条件都不满足，则尝试执行rdbSaveBackground函数进行后台保存，如果保存成功，
+        // 则回复状态信息"Background saving started"，
         addReplyStatus(c,"Background saving started");
     } else {
+        // 如果保存失败，则回复错误信息。
         addReply(c,shared.err);
     }
 }
