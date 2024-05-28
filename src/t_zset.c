@@ -119,7 +119,7 @@ void zslFree(zskiplist *zsl) {
  * The return value of this function is between 1 and ZSKIPLIST_MAXLEVEL
  * (both inclusive), with a powerlaw-alike distribution where higher
  * levels are less likely to be returned. */
-int f(void) {
+int zslRandomLevel(void) {
     int level = 1;
     while ((random()&0xFFFF) < (ZSKIPLIST_P * 0xFFFF))
         level += 1;
@@ -140,37 +140,65 @@ zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele) {
 
     serverAssert(!isnan(score));
     x = zsl->header;
+    // 外层的for循环是来控制层数的，
+    // 内层的while循环控制链表循环
     for (i = zsl->level-1; i >= 0; i--) {
-        /* store rank that is crossed to reach the insert position */
+        /*
+         * store rank that is crossed to reach the insert position
+         * 存储到达插入位置时穿过的排名。
+         * */
+        // 如果当前层数已经为level最顶层了，那么rank[i] = 0，此时x就是头节点，头节点的rank值是0
+        // 否则就是后一层的rank值，rank[i+1]
+        // 这里为什么是i+1呢？我们假设当前层数为2，level是从0开始计算的，所以就需要zsl->level-1，那么i就是1，
+        // 那么rank[1] = 0;
+        // 接着i--，变为0。rank[0] = rank[0+1] = rank[1] = 0; 意思就是上一层到当前层的跨度是多少。
         rank[i] = i == (zsl->level-1) ? 0 : rank[i+1];
+        // x->level[i].forward 当前层的下一个节点存在
         while (x->level[i].forward &&
-                (x->level[i].forward->score < score ||
-                    (x->level[i].forward->score == score &&
-                    sdscmp(x->level[i].forward->ele,ele) < 0)))
+                (
+                    // 当前层的下一个节点分数小于要插入的分数
+                    x->level[i].forward->score < score
+                    // 当前层的下一个节点分数等于要插入的分数，并且当前层的下一个节点的元素小于要插入的元素
+                    || (x->level[i].forward->score == score && sdscmp(x->level[i].forward->ele,ele) < 0)
+                )
+        )
         {
+            // 计算当前层的跨度
             rank[i] += x->level[i].span;
+            // 移动到下一个节点
             x = x->level[i].forward;
         }
         update[i] = x;
     }
-    /* we assume the element is not already inside, since we allow duplicated
-     * scores, reinserting the same element should never happen since the
+    /* we assume the element is not already inside,
+     * since we allow duplicated scores,
+     * reinserting the same element should never happen since the
      * caller of zslInsert() should test in the hash table if the element is
      * already inside or not. */
+    // 获取level层数
     level = zslRandomLevel();
+    // 如果随机的层数大于当前level，那么更新level和update数组
     if (level > zsl->level) {
+        // i为当前层数，i < 随机层数，就要补齐到随机层数
         for (i = zsl->level; i < level; i++) {
             rank[i] = 0;
             update[i] = zsl->header;
             update[i]->level[i].span = zsl->length;
         }
+        // 更新跳跃表的高度
         zsl->level = level;
     }
+    // 新建一个节点，到这里看起来新插入节点的高度也是随机的
     x = zslCreateNode(level,score,ele);
+    // 从第最底层也就是第0层开始计算，直到随机的第level层。
     for (i = 0; i < level; i++) {
+        // 让新节点的next指向update[i]的next
         x->level[i].forward = update[i]->level[i].forward;
+        // 原先节点指向next的指向新节点
+        // 举个例子： 1 —> 5 现在要在1-5之间插入一个4，就是1->4->5
         update[i]->level[i].forward = x;
 
+        // 这里计算新节点的跨度
         /* update span covered by update[i] as x is inserted here */
         x->level[i].span = update[i]->level[i].span - (rank[0] - rank[i]);
         update[i]->level[i].span = (rank[0] - rank[i]) + 1;
