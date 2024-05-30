@@ -2541,7 +2541,16 @@ void bgsaveCommand(client *c) {
  * that is normally stack-allocated in the caller, returns the populated
  * pointer if the instance has a valid master client, otherwise NULL
  * is returned, and the RDB saving will not persist any replication related
- * information. */
+ * information.
+ *
+ * 用于填充 `rdbSaveInfo` 结构体的函数，该结构体旨在将复制信息保存在 RDB 文件内部。
+ * 目前，该结构体明确包含了来自主服务器流的当前选定数据库。
+ * 然而，如果 `rdbSave*()` 系列函数接收到了一个 `NULL` 的 `rsi` 结构体，
+ * 那么复制ID和偏移量也将不会被保存。此函数负责填充通常在调用者堆栈上分配的 `rsi`。
+ * 如果实例拥有一个有效的主客户端，则返回填充后的 `rsi` 指针；
+ * 否则，返回 `NULL`，并且 RDB 保存过程中将不会保留任何与复制相关的信息。
+ * */
+
 rdbSaveInfo *rdbPopulateSaveInfo(rdbSaveInfo *rsi) {
     rdbSaveInfo rsi_init = RDB_SAVE_INFO_INIT;
     *rsi = rsi_init;
@@ -2552,19 +2561,31 @@ rdbSaveInfo *rdbPopulateSaveInfo(rdbSaveInfo *rsi) {
      * scenario the replication info is useless, because when a slave
      * connects to us, the NULL repl_backlog will trigger a full
      * synchronization, at the same time we will use a new replid and clear
-     * replid2. */
+     * replid2.
+     *
+     * 如果实例是主服务器，我们只能在 repl_backlog 不为 NULL 时填充复制信息。
+     * 如果 repl_backlog 为 NULL，这意味着该实例未参与任何复制链。
+     * 在这种情况下，复制信息是无用的，因为当一个从服务器连接到我们时，
+     * NULL 的 repl_backlog 将触发全量同步。同时，我们会使用新的 replid 并清除 replid2。
+     * */
     if (!server.masterhost && server.repl_backlog) {
         /* Note that when server.slaveseldb is -1, it means that this master
          * didn't apply any write commands after a full synchronization.
          * So we can let repl_stream_db be 0, this allows a restarted slave
          * to reload replication ID/offset, it's safe because the next write
-         * command must generate a SELECT statement. */
+         * command must generate a SELECT statement.
+         * 请注意，当 server.slaveseldb 的值为 -1 时，这表示该主服务器在完成一次全量同步后尚未应用任何写入命令。
+         * 因此，我们可以将 repl_stream_db 设为 0，这样做允许重新启动的从服务器重新加载复制的 ID 和偏移量。
+         * 这样做是安全的，因为接下来的任何写入命令必定会产生一个 SELECT 语句，从而正确设置数据库上下文。
+         * */
         rsi->repl_stream_db = server.slaveseldb == -1 ? 0 : server.slaveseldb;
         return rsi;
     }
 
     /* If the instance is a slave we need a connected master
-     * in order to fetch the currently selected DB. */
+     * in order to fetch the currently selected DB.
+     * 如果实例是从服务器，我们需要与主服务器建立连接，以便获取当前选定的数据库。
+     * */
     if (server.master) {
         rsi->repl_stream_db = server.master->db->id;
         return rsi;
@@ -2574,10 +2595,15 @@ rdbSaveInfo *rdbPopulateSaveInfo(rdbSaveInfo *rsi) {
      * replication selected DB info inside the RDB file: the slave can
      * increment the master_repl_offset only from data arriving from the
      * master, so if we are disconnected the offset in the cached master
-     * is valid. */
+     * is valid.
+     * 如果存在已缓存的主服务器信息，我们可以利用它来填充RDB文件中的复制选定数据库信息：
+     * 从服务器只能根据来自主服务器的数据增加master_repl_offset，
+     * 因此，如果我们当前与主服务器断开连接，缓存中主服务器的偏移量仍然是有效的。
+     * */
     if (server.cached_master) {
         rsi->repl_stream_db = server.cached_master->db->id;
         return rsi;
     }
     return NULL;
 }
+

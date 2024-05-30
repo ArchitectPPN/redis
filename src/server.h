@@ -1115,11 +1115,42 @@ struct redisServer {
     int aof_stop_sending_diff;     /* If true stop sending accumulated diffs
                                       to child process. */
     sds aof_child_diff;             /* AOF diff accumulator child side. */
-    /* RDB persistence */
-    long long dirty;                /* Changes to DB from the last save */
-    long long dirty_before_bgsave;  /* Used to restore dirty on failed BGSAVE */
-    pid_t rdb_child_pid;            /* PID of RDB saving child */
-    struct saveparam *saveparams;   /* Save points array for RDB */
+
+    /**
+     * 从这些参数上可以看到看到rdb需要解决的问题:
+     * 1. rdb失败了怎么办?
+     * 2. rdb文件名
+     * 3. rdb文件是否需要压缩?
+     * 4. rdb文件需要保证不能被修改,这里用crc64
+     * 5. rdb字进程在处理时需要告知父进程, 如何告知的问题?
+     * 6. 记录最后一次成功保存时间
+     * 7. 记录最后一次尝试的时间
+     * 8.
+     *
+     */
+    /* RDB persistence RDB持久化 */
+    /*
+     * Changes to DB from the last save
+     * 自上次保存以来对数据库的更改
+     * */
+    long long dirty;
+    /*
+     * Used to restore dirty on failed
+     * "用于在后台保存（BGSAVE）失败时恢复脏数据"。
+     * 在Redis这样的内存数据存储系统中，BGSAVE 是一个命令，它在后台创建数据库的磁盘快照（snapshot）。
+     * "Dirty" 在这里通常指的是内存中已修改但尚未持久化的数据。
+     * 如果BGSAVE过程由于某种原因失败，这段代码可能是用来确保在失败后能够恢复那些未保存的更改，以防止数据丢失。
+     * 这通常涉及到错误处理和恢复策略，确保数据一致性。
+     * */
+    long long dirty_before_bgsave;
+    /* PID of RDB saving child
+     * pid_t类型的变量，用于存储RDB保存子进程的PID。
+     * pid_t是一个在C和C++中处理进程ID的标准类型，通常定义在<sys/types.h>或<unistd.h>头文件中。
+     * 它是一个整型数据，用来存储一个进程的唯一标识符（PID）。
+     * */
+    pid_t rdb_child_pid;
+    /* Save points array for RDB */
+    struct saveparam *saveparams;
     int saveparamslen;              /* Number of saving points */
     char *rdb_filename;             /* Name of RDB file */
     int rdb_compression;            /* Use compression in RDB? */
@@ -1155,7 +1186,7 @@ struct redisServer {
     long long second_replid_offset; /* Accept offsets up to this for replid2. */
     int slaveseldb;                 /* Last SELECTed DB in replication output */
     int repl_ping_slave_period;     /* Master pings the slave every N seconds */
-    char *repl_backlog;             /* Replication backlog for partial syncs */
+    char *repl_backlog;             /* Replication backlog for partial syncs 该函数定义了一个字符型指针repl_backlog，用于存储复制积压缓冲区（replication backlog），该缓冲区用于部分同步 */
     long long repl_backlog_size;    /* Backlog circular buffer size */
     long long repl_backlog_histlen; /* Backlog actual data length */
     long long repl_backlog_idx;     /* Backlog circular buffer current offset,
