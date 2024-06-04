@@ -1329,9 +1329,15 @@ int rdbSaveBackground(char *filename, rdbSaveInfo *rsi) {
     pid_t childpid;
     long long start;
 
+    // 该函数用于检查Redis服务器是否正在执行AOF或RDB持久化操作。如果有子进程正在执行相关操作，则函数返回C_ERR，表示操作失败；否则返回C_OK，表示操作成功。这主要是为了确保在进行持久化操作时，不会同时启动多个持久化进程，避免数据一致性问题。
     if (server.aof_child_pid != -1 || server.rdb_child_pid != -1) return C_ERR;
 
+    // dirty_before_bgsave的值为当前server.dirty的值。
+    // server.dirty表示Redis服务器中数据集的脏标志，如果数据集被修改，该值会被设置为1，表示数据集需要进行持久化。
+    // server.dirty_before_bgsave用于记录在上一次后台保存（bgsave）之前，数据集是否被修改过。
+    // 因此，该函数的主要作用是在进行后台保存操作之前，保存当前数据集是否被修改的状态，以便在保存完成后进行比较，判断是否需要重新进行持久化操作。
     server.dirty_before_bgsave = server.dirty;
+    // 记录当前时间作为上次尝试持久化操作的时间
     server.lastbgsave_try = time(NULL);
     openChildInfoPipe();
 

@@ -34,6 +34,11 @@
  * RDB / AOF saving process from the child to the parent (for instance
  * the amount of copy on write memory used) */
 void openChildInfoPipe(void) {
+    /**
+     * pipe是C语言标准库中的一个系统调用，在POSIX兼容系统（如Unix、Linux）中提供。它不是内置函数，而是一个由操作系统提供的功能，允许进程间通信（IPC）。通过调用pipe，用户空间程序可以创建一个单向的数据通道，并获得一对文件描述符来分别进行读取和写入操作。
+     * pipe_fds[2] 这个数组的长度必须为2。pipe()函数返回一个包含两个元素的整数数组pipe_fds。这两个元素分别代表管道的读端和写端文件描述符。数组的第一个元素pipe_fds[0]通常用于读取数据，第二个元素pipe_fds[1]用于写入数据。在使用完管道后，通常需要关闭不需要的文件描述符以避免资源泄漏。
+     * 在某些情况下，你可能会看到将这两个文件描述符分开存储到不同的变量中，但基本思想是一样的：一个用于读，一个用于写。因此，数组的长度必须至少为2。
+     */
     if (pipe(server.child_info_pipe) == -1) {
         /* On error our two file descriptors should be still set to -1,
          * but we call anyway cloesChildInfoPipe() since can't hurt. */
