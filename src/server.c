@@ -2065,6 +2065,7 @@ void initServer(void) {
 
     createSharedObjects();
     adjustOpenFilesLimit();
+    // 创建事件循环
     server.el = aeCreateEventLoop(server.maxclients+CONFIG_FDSET_INCR);
     if (server.el == NULL) {
         serverLog(LL_WARNING,
@@ -4269,8 +4270,11 @@ int main(int argc, char **argv) {
     /* Store the executable path and arguments in a safe place in order
      * to be able to restart the server later. */
     server.executable = getAbsolutePath(argv[0]);
+    // 保存命令行输入的参数
     server.exec_argv = zmalloc(sizeof(char*)*(argc+1));
+    // 最后一个参数设置为NULL
     server.exec_argv[argc] = NULL;
+    // 循环的将每个参数放入exec_argv中
     for (j = 0; j < argc; j++) server.exec_argv[j] = zstrdup(argv[j]);
 
     /* We need to init sentinel right now as parsing the configuration file
@@ -4311,6 +4315,8 @@ int main(int argc, char **argv) {
         }
 
         /* First argument is the config file name? */
+        // 比如说这样启动：redis-server ./redis.conf
+        // ./redis.conf 其实就是配置文件的路径
         if (argv[j][0] != '-' || argv[j][1] != '-') {
             configfile = argv[j];
             server.configfile = getAbsolutePath(configfile);
@@ -4328,6 +4334,7 @@ int main(int argc, char **argv) {
         while(j != argc) {
             if (argv[j][0] == '-' && argv[j][1] == '-') {
                 /* Option name */
+                // argv[j] 完全等于 --check-rdb 命令时
                 if (!strcmp(argv[j], "--check-rdb")) {
                     /* Argument has no options, need to skip for parsing. */
                     j++;
