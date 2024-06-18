@@ -2036,6 +2036,14 @@ void resetServerStats(void) {
 void initServer(void) {
     int j;
 
+    /**
+     * 这段代码设置了两个信号的处理方式。
+     * 首先，signal(SIGHUP, SIG_IGN) 表示忽略 SIGHUP 信号。
+     * SIGHUP 信号通常在终端关闭或进程重新挂载时发送给进程，设置为忽略后，进程不会因终端关闭而退出。
+     * 其次，signal(SIGPIPE, SIG_IGN) 表示忽略 SIGPIPE 信号。
+     * SIGPIPE 信号在进程向一个已关闭的套接字或无效的套接字地址发送数据时产生，设置为忽略后，进程不会因写入无效套接字而退出。
+     * 通过忽略这两个信号，进程可以在终端关闭或套接字无效时继续运行，而不是直接退出。
+     */
     signal(SIGHUP, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);
     setupSignalHandlers();
@@ -2065,6 +2073,7 @@ void initServer(void) {
 
     createSharedObjects();
     adjustOpenFilesLimit();
+    // 初始化server的事件循环
     server.el = aeCreateEventLoop(server.maxclients+CONFIG_FDSET_INCR);
     if (server.el == NULL) {
         serverLog(LL_WARNING,
@@ -2108,7 +2117,8 @@ void initServer(void) {
         server.db[j].avg_ttl = 0;
         server.db[j].defrag_later = listCreate();
     }
-    evictionPoolAlloc(); /* Initialize the LRU keys pool. */
+    /* Initialize the LRU keys pool. */
+    evictionPoolAlloc();
     server.pubsub_channels = dictCreate(&keylistDictType,NULL);
     server.pubsub_patterns = listCreate();
     listSetFreeMethod(server.pubsub_patterns,freePubsubPattern);
@@ -2144,16 +2154,17 @@ void initServer(void) {
     server.aof_last_write_errno = 0;
     server.repl_good_slaves_count = 0;
 
-    /* Create the timer callback, this is our way to process many background
-     * operations incrementally, like clients timeout, eviction of unaccessed
-     * expired keys and so forth. */
+    /* Create the timer callback,
+     * this is our way to process many background operations incrementally,
+     * like clients timeout,
+     * eviction of unaccessed expired keys and so forth.
+     * */
     if (aeCreateTimeEvent(server.el, 1, serverCron, NULL, NULL) == AE_ERR) {
         serverPanic("Can't create event loop timers.");
         exit(1);
     }
 
-    /* Create an event handler for accepting new connections in TCP and Unix
-     * domain sockets. */
+    /* Create an event handler for accepting new connections in TCP and Unix domain sockets. */
     for (j = 0; j < server.ipfd_count; j++) {
         if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
             acceptTcpHandler,NULL) == AE_ERR)
@@ -4263,6 +4274,7 @@ int main(int argc, char **argv) {
     getRandomHexChars(hashseed,sizeof(hashseed));
     dictSetHashFunctionSeed((uint8_t*)hashseed);
     server.sentinel_mode = checkForSentinelMode(argc,argv);
+    // 初始化配置
     initServerConfig();
     moduleInitModulesSystem();
 
