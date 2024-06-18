@@ -990,11 +990,27 @@ struct redisServer {
     int bindaddr_count;         /* Number of addresses in server.bindaddr[] */
     char *unixsocket;           /* UNIX socket path */
     mode_t unixsocketperm;      /* UNIX socket permission */
-    int ipfd[CONFIG_BINDADDR_MAX]; /* TCP socket file descriptors */
-    int ipfd_count;             /* Used slots in ipfd[] */
-    int sofd;                   /* Unix socket file descriptor */
-    int cfd[CONFIG_BINDADDR_MAX];/* Cluster bus listening socket */
-    int cfd_count;              /* Used slots in cfd[] */
+	/*
+	 * TCP socket file descriptors
+	 * TCP套接字文件描述符
+	 */
+    int ipfd[CONFIG_BINDADDR_MAX];
+	/*
+	 * Used slots in ipfd[]
+	 * ipfd[]中已使用的槽位
+	*/
+    int ipfd_count;
+	/*
+	 * Unix socket file descriptor
+     * Unix套接字文件描述符
+	 */
+    int sofd;
+	/*
+	 * Cluster bus listening socket
+ 	 * 集群总线监听套接字
+	 */
+    int cfd[CONFIG_BINDADDR_MAX];
+    int cfd_count;              /* Used slots in cfd[] cfd[]中已占用的槽位 */
     list *clients;              /* List of active clients */
     list *clients_to_close;     /* Clients to close asynchronously */
     list *clients_pending_write; /* There is to write or install handler. */

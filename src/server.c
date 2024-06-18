@@ -1917,33 +1917,48 @@ void checkTcpBacklogSettings(void) {
 
 /* Initialize a set of file descriptors to listen to the specified 'port'
  * binding the addresses specified in the Redis server configuration.
+ * 初始化一组文件描述符以监听指定的'port'，并根据Redis服务器配置绑定指定的地址。
  *
  * The listening file descriptors are stored in the integer array 'fds'
  * and their number is set in '*count'.
+ * 监听的文件描述符存储在整型数组'fds'中，并且它们的数量被设置在'*count'里。
  *
  * The addresses to bind are specified in the global server.bindaddr array
  * and their number is server.bindaddr_count. If the server configuration
  * contains no specific addresses to bind, this function will try to
  * bind * (all addresses) for both the IPv4 and IPv6 protocols.
+ * 要绑定的地址在全局server.bindaddr数组中指定，其数量为server.bindaddr_count。
+ * 如果服务器配置中没有特定的绑定地址，此函数将尝试为IPv4和IPv6协议都绑定*（所有地址）。
  *
  * On success the function returns C_OK.
+ * 函数成功时返回C_OK
  *
  * On error the function returns C_ERR. For the function to be on
  * error, at least one of the server.bindaddr addresses was
  * impossible to bind, or no bind addresses were specified in the server
  * configuration but the function is not able to bind * for at least
- * one of the IPv4 or IPv6 protocols. */
+ * one of the IPv4 or IPv6 protocols.
+ *
+ * 在出错的情况下，函数返回C_ERR。
+ * 函数出错意味着至少有一个server.bindaddr中的地址无法绑定，或者服务器配置中没有指定任何绑定地址，并且函数无法为IPv4或IPv6协议中的至少一个绑定*。
+ * */
 int listenToPort(int port, int *fds, int *count) {
     int j;
 
-    /* Force binding of 0.0.0.0 if no bind address is specified, always
-     * entering the loop if j == 0. */
+    /* Force binding of 0.0.0.0 if no bind address is specified, always entering the loop if j == 0.
+    *  如果未指定绑定地址，则强制绑定到0.0.0.0；如果j等于0，则始终进入循环。
+    * */
     if (server.bindaddr_count == 0) server.bindaddr[0] = NULL;
+    // 这里bindaddr_count的个数为redisConf中配置的地址数量
     for (j = 0; j < server.bindaddr_count || j == 0; j++) {
         if (server.bindaddr[j] == NULL) {
             int unsupported = 0;
-            /* Bind * for both IPv6 and IPv4, we enter here only if
-             * server.bindaddr_count == 0. */
+            /*
+             *  Bind * for both IPv6 and IPv4, we enter here only if server.bindaddr_count == 0.
+             *  当服务器需要同时为IPv6和IPv4绑定通配符地址（即监听所有IPv6和IPv4地址）时，
+             *  只有在server.bindaddr_count的值为0的情况下，我们才会进入这段代码逻辑。
+             *  这意味着之前没有显式绑定任何地址，于是采用默认行为，监听所有网络接口上的连接请求。
+             */
             fds[*count] = anetTcp6Server(server.neterr,port,NULL,
                 server.tcp_backlog);
             if (fds[*count] != ANET_ERR) {
@@ -1954,8 +1969,12 @@ int listenToPort(int port, int *fds, int *count) {
                 serverLog(LL_WARNING,"Not listening to IPv6: unsupproted");
             }
 
+            // 绑定IPV6成功 或者 绑定IPV6不支持
             if (*count == 1 || unsupported) {
-                /* Bind the IPv4 address as well. */
+                /*
+                 * Bind the IPv4 address as well.
+                 * 同时绑定IPv4地址。
+                 */
                 fds[*count] = anetTcpServer(server.neterr,port,NULL,
                     server.tcp_backlog);
                 if (fds[*count] != ANET_ERR) {

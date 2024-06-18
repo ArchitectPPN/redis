@@ -62,8 +62,10 @@ int anetSetBlock(char *err, int fd, int non_block) {
     int flags;
 
     /* Set the socket blocking (if non_block is zero) or non-blocking.
-     * Note that fcntl(2) for F_GETFL and F_SETFL can't be
-     * interrupted by a signal. */
+     * Note that fcntl(2) for F_GETFL and F_SETFL can't be interrupted by a signal.
+     * 设置套接字为阻塞模式（如果non_block为0）或非阻塞模式。
+     * 需要注意的是，使用fcntl(2)调用进行F_GETFL和F_SETFL操作（获取或设置文件描述符的标志）是不会被信号中断的。
+     * */
     if ((flags = fcntl(fd, F_GETFL)) == -1) {
         anetSetError(err, "fcntl(F_GETFL): %s", strerror(errno));
         return ANET_ERR;
@@ -81,10 +83,12 @@ int anetSetBlock(char *err, int fd, int non_block) {
     return ANET_OK;
 }
 
+// 设置阻塞： 1非阻塞
 int anetNonBlock(char *err, int fd) {
     return anetSetBlock(err,fd,1);
 }
 
+// 设置阻塞： 0阻塞
 int anetBlock(char *err, int fd) {
     return anetSetBlock(err,fd,0);
 }
@@ -500,11 +504,13 @@ end:
     return s;
 }
 
+// AF_INET  IPv4
 int anetTcpServer(char *err, int port, char *bindaddr, int backlog)
 {
     return _anetTcpServer(err, port, bindaddr, AF_INET, backlog);
 }
 
+// AF_INET6  IPv6
 int anetTcp6Server(char *err, int port, char *bindaddr, int backlog)
 {
     return _anetTcpServer(err, port, bindaddr, AF_INET6, backlog);

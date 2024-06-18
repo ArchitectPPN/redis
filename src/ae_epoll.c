@@ -37,20 +37,24 @@ typedef struct aeApiState {
 } aeApiState;
 
 static int aeApiCreate(aeEventLoop *eventLoop) {
+    // 分配内存， 分配失败， 退出
     aeApiState *state = zmalloc(sizeof(aeApiState));
 
     if (!state) return -1;
+    // 分配内存， 分配失败， 退出
     state->events = zmalloc(sizeof(struct epoll_event)*eventLoop->setsize);
     if (!state->events) {
         zfree(state);
         return -1;
     }
+
     state->epfd = epoll_create(1024); /* 1024 is just a hint for the kernel */
     if (state->epfd == -1) {
         zfree(state->events);
         zfree(state);
         return -1;
     }
+
     eventLoop->apidata = state;
     return 0;
 }
@@ -73,8 +77,13 @@ static void aeApiFree(aeEventLoop *eventLoop) {
 static int aeApiAddEvent(aeEventLoop *eventLoop, int fd, int mask) {
     aeApiState *state = eventLoop->apidata;
     struct epoll_event ee = {0}; /* avoid valgrind warning */
-    /* If the fd was already monitored for some event, we need a MOD
-     * operation. Otherwise we need an ADD operation. */
+    /* If the fd was already monitored for some event,
+     * 如果文件描述符(fd)已经被监控以便监听某些事件，
+     * we need a MOD operation.
+     * 那么我们需要执行一次修改(MOD)操作。
+     * Otherwise we need an ADD operation.
+     * 否则，我们需要执行一次添加(ADD)操作。
+     * */
     int op = eventLoop->events[fd].mask == AE_NONE ?
             EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
