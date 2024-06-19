@@ -1064,12 +1064,20 @@ void databasesCron(void) {
  * virtual memory and aging there is to store the current time in objects at
  * every object access, and accuracy is not needed. To access a global var is
  * a lot faster than calling time(NULL).
+ * 我们在全局状态中缓存了Unix时间戳，因为在使用虚拟内存和老化机制的系统中，
+ * 如果在每次访问对象时都存储当前时间，会增加开销，并且这样做对精度要求不高。
+ * 访问全局变量比每次调用 time(NULL) 函数要快得多
  *
  * This function should be fast because it is called at every command execution
  * in call(), so it is possible to decide if to update the daylight saving
  * info or not using the 'update_daylight_info' argument. Normally we update
  * such info only when calling this function from serverCron() but not when
- * calling it from call(). */
+ * calling it from call().
+ *
+ * 此函数需要快速执行，因为它在每次通过call()执行命令时都会被调用。
+ * 因此，我们可以通过update_daylight_info参数来决定是否更新夏令时信息。
+ * 通常情况下，我们只在从serverCron()函数调用此函数时更新这些信息，而在从call()函数调用时则不进行更新。
+ *  */
 void updateCachedTime(int update_daylight_info) {
     server.ustime = ustime();
     server.mstime = server.ustime / 1000;
@@ -1091,39 +1099,66 @@ void updateCachedTime(int update_daylight_info) {
 
 /* This is our timer interrupt, called server.hz times per second.
  * Here is where we do a number of things that need to be done asynchronously.
+ * 这是我们的定时器中断，每秒被调用 server.hz 。
+ * 在这里，我们完成了许多需要异步执行的任务。
+ *
  * For instance:
  *
- * - Active expired keys collection (it is also performed in a lazy way on
- *   lookup).
+ * - Active expired keys collection (it is also performed in a lazy way on lookup).
+ * 活跃过期键的收集（此操作也在查找时以惰性方式执行）。
  * - Software watchdog.
+ * 软件看门狗。
  * - Update some statistic.
+ * 更新一些统计信息。
  * - Incremental rehashing of the DBs hash tables.
+ * 重新rehash
  * - Triggering BGSAVE / AOF rewrite, and handling of terminated children.
+ * 触发 BGSAVE / AOF 重写，并处理已终止子进程。
  * - Clients timeout of different kinds.
+ * 客户端出现不同类型的超时。
  * - Replication reconnection.
+ * 从库重新连接。
  * - Many more...
  *
  * Everything directly called here will be called server.hz times per second,
  * so in order to throttle execution of things we want to do less frequently
  * a macro is used: run_with_period(milliseconds) { .... }
+ *
+ * 直接在这里调用的所有操作都将每秒执行 server.hz 次，
+ * 为了控制我们希望不那么频繁执行的操作的频率，
+ * 使用了一个宏：run_with_period(milliseconds) { .... }
  */
 
 int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
+    /*
+     * UNUSED 通常是一个预处理宏，用于标记一个函数参数或变量未被使用，以避免编译器警告。
+     * 它没有实际的功能，只是告诉编译器该符号虽然被定义了，但在当前上下文中没有被利用。
+     * 这是一个在C/C++编程中常见的做法，用于清理未使用变量导致的编译警告。
+     **/
     int j;
     UNUSED(eventLoop);
     UNUSED(id);
     UNUSED(clientData);
 
-    /* Software watchdog: deliver the SIGALRM that will reach the signal
-     * handler if we don't return here fast enough. */
+    /*
+     * Software watchdog:
+     * deliver the SIGALRM that will reach the signal handler if we don't return here fast enough.
+     *
+     * 软件看门狗：
+     * 如果在此处未能快速返回，将发送到达信号处理器的 SIGALRM 信号。 此举用于监控程序，确保定时任务不会因意外情况而长时间阻塞，从而保障系统响应性和稳定性。
+     * */
     if (server.watchdog_period) watchdogScheduleSignal(server.watchdog_period);
 
     /* Update the time cache. */
     updateCachedTime(1);
 
+    // 感觉像使用配置的值
     server.hz = server.config_hz;
     /* Adapt the server.hz value to the number of configured clients. If we have
-     * many clients, we want to call serverCron() with an higher frequency. */
+     * many clients, we want to call serverCron() with an higher frequency.
+     * 根据配置的客户端数量调整server.hz值。
+     * 如果我们有很多客户端，我们希望以更高的频率调用serverCron()函数。
+     * */
     if (server.dynamic_hz) {
         while (listLength(server.clients) / server.hz >
                MAX_CLIENTS_PER_CLOCK_TICK)
@@ -1224,14 +1259,22 @@ int serverCron(struct aeEventLoop *eventLoop, long long id, void *clientData) {
         }
     }
 
-    /* We need to do a few operations on clients asynchronously. */
+    /*
+    * We need to do a few operations on clients asynchronously.
+    * 我们需要异步地对客户端执行一些操作。
+    * */
     clientsCron();
 
-    /* Handle background operations on Redis databases. */
+    /*
+     * Handle background operations on Redis databases.
+     * 在Redis数据库上执行后台操作。
+     * */
     databasesCron();
 
-    /* Start a scheduled AOF rewrite if this was requested by the user while
-     * a BGSAVE was in progress. */
+    /*
+     * Start a scheduled AOF rewrite if this was requested by the user while a BGSAVE was in progress.
+     * 如果用户在后台保存（BGSAVE）操作正在进行时请求了AOF重写，则开始计划的AOF重写过程。
+     * */
     if (server.rdb_child_pid == -1 && server.aof_child_pid == -1 &&
         server.aof_rewrite_scheduled)
     {

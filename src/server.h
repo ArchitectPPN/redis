@@ -955,9 +955,16 @@ struct redisServer {
     char **exec_argv;           /* Executable argv vector (copy). */
     int dynamic_hz;             /* Change hz value depending on # of clients. */
     int config_hz;              /* Configured HZ value. May be different than
-                                   the actual 'hz' field value if dynamic-hz
-                                   is enabled. */
-    int hz;                     /* serverCron() calls frequency in hertz */
+                                 * the actual 'hz' field value if dynamic-hz
+                                 * is enabled.
+                                 * 配置的HZ值。
+                                 * 如果启用了动态HZ（dynamic-hz）功能，该值可能与实际的hz字段值不同。
+                                 */
+    /*
+     * serverCron() calls frequency in hertz serverCron()
+     * 被调用的频率以赫兹为单位。
+     */
+    int hz;
     redisDb *db;
     dict *commands;             /* Command table */
     dict *orig_commands;        /* Command table before command renaming. */
@@ -1348,7 +1355,11 @@ struct redisServer {
     const char *assert_file;
     int assert_line;
     int bug_report_start; /* True if bug report header was already logged. */
-    int watchdog_period;  /* Software watchdog period in ms. 0 = off */
+    /*
+     * Software watchdog period in ms. 0 = off
+     * 软件看门狗的周期，单位为毫秒。设为0表示关闭看门狗功能。
+     * */
+    int watchdog_period;
     /* System hardware info */
     size_t system_memory_size;  /* Total memory in system as reported by OS */
 
