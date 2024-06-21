@@ -1942,7 +1942,11 @@ void adjustOpenFilesLimit(void) {
 }
 
 /* Check that server.tcp_backlog can be actually enforced in Linux according
- * to the value of /proc/sys/net/core/somaxconn, or warn about it. */
+ * to the value of /proc/sys/net/core/somaxconn, or warn about it.
+ *
+ * 检查服务器的tcp_backlog配置是否能根据Linux系统中/proc/sys/net/core/somaxconn的值来实际执行，
+ * 如果不能则发出警告。
+ * */
 void checkTcpBacklogSettings(void) {
 #ifdef HAVE_PROC_SOMAXCONN
     FILE *fp = fopen("/proc/sys/net/core/somaxconn","r");
@@ -2179,7 +2183,9 @@ void initServer(void) {
         server.db[j].avg_ttl = 0;
         server.db[j].defrag_later = listCreate();
     }
-    /* Initialize the LRU keys pool. */
+    /* Initialize the LRU keys pool.
+     * 初始化LRU键值池。
+     * */
     evictionPoolAlloc();
     server.pubsub_channels = dictCreate(&keylistDictType,NULL);
     server.pubsub_patterns = listCreate();
@@ -2240,7 +2246,9 @@ void initServer(void) {
 
 
     /* Register a readable event for the pipe used to awake the event loop
-     * when a blocked client in a module needs attention. */
+     * when a blocked client in a module needs attention.
+     * 为模块中用于唤醒事件循环的管道注册一个可读事件，当模块中被阻塞的客户端需要关注时触发。
+     * */
     if (aeCreateFileEvent(server.el, server.module_blocked_pipe[0], AE_READABLE,
         moduleBlockedClientPipeReadable,NULL) == AE_ERR) {
             serverPanic(

@@ -60,14 +60,19 @@
     #endif
 #endif
 
-aeEventLoop *aeCreateEventLoop(int setsize) {
+aeEventLoop * aeCreateEventLoop(int setsize) {
     aeEventLoop *eventLoop;
     int i;
 
+    /**
+     * 对eventLoop进行初始化
+     */
     if ((eventLoop = zmalloc(sizeof(*eventLoop))) == NULL) goto err;
     eventLoop->events = zmalloc(sizeof(aeFileEvent)*setsize);
     eventLoop->fired = zmalloc(sizeof(aeFiredEvent)*setsize);
+    // 为NULL说明初始化失败,直接退出
     if (eventLoop->events == NULL || eventLoop->fired == NULL) goto err;
+    // 这个数量是在配置文件中设置: redisConf: maxclients
     eventLoop->setsize = setsize;
     eventLoop->lastTime = time(NULL);
     eventLoop->timeEventHead = NULL;
