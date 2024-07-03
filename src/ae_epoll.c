@@ -47,8 +47,11 @@ static int aeApiCreate(aeEventLoop *eventLoop) {
         zfree(state);
         return -1;
     }
-
-    state->epfd = epoll_create(1024); /* 1024 is just a hint for the kernel */
+    /*
+     * 1024 is just a hint for the kernel
+     * 1024 对于内核来说只是一个提示
+     * */
+    state->epfd = epoll_create(1024);
     if (state->epfd == -1) {
         zfree(state->events);
         zfree(state);

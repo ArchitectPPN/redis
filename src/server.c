@@ -2149,7 +2149,9 @@ void initServer(void) {
     }
     server.db = zmalloc(sizeof(redisDb)*server.dbnum);
 
-    /* Open the TCP listening socket for the user commands. */
+    /* Open the TCP listening socket for the user commands.
+     * listenToPort 中做了创建socket, 设置socket, bind, listen, 设置socket为非阻塞
+     * */
     if (server.port != 0 &&
         listenToPort(server.port,server.ipfd,&server.ipfd_count) == C_ERR)
         exit(1);
@@ -4461,7 +4463,7 @@ int main(int argc, char **argv) {
     server.supervised = redisIsSupervised(server.supervised_mode);
     int background = server.daemonize && !server.supervised;
     if (background) daemonize();
-
+    // 初始化服务
     initServer();
     if (background || server.pidfile) createPidFile();
     redisSetProcTitle(argv[0]);
