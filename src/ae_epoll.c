@@ -50,6 +50,7 @@ static int aeApiCreate(aeEventLoop *eventLoop) {
     /*
      * 1024 is just a hint for the kernel
      * 1024 对于内核来说只是一个提示
+     * 实际上去拿epoll的描述符fd
      * */
     state->epfd = epoll_create(1024);
     if (state->epfd == -1) {
