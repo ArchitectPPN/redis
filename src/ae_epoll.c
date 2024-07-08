@@ -48,7 +48,11 @@ static int aeApiCreate(aeEventLoop *eventLoop) {
         return -1;
     }
 
-    state->epfd = epoll_create(1024); /* 1024 is just a hint for the kernel */
+    /*
+     * 1024 is just a hint for the kernel
+     * 1024对内核来说只是一个提示
+     * */
+    state->epfd = epoll_create(1024);
     if (state->epfd == -1) {
         zfree(state->events);
         zfree(state);
@@ -76,7 +80,11 @@ static void aeApiFree(aeEventLoop *eventLoop) {
 
 static int aeApiAddEvent(aeEventLoop *eventLoop, int fd, int mask) {
     aeApiState *state = eventLoop->apidata;
-    struct epoll_event ee = {0}; /* avoid valgrind warning */
+    /*
+     * avoid valgrind warning
+     * 避免valgrind警告
+     * */
+    struct epoll_event ee = {0};
     /* If the fd was already monitored for some event,
      * 如果文件描述符(fd)已经被监控以便监听某些事件，
      * we need a MOD operation.
