@@ -82,8 +82,10 @@ aeEventLoop * aeCreateEventLoop(int setsize) {
     eventLoop->beforesleep = NULL;
     eventLoop->aftersleep = NULL;
     if (aeApiCreate(eventLoop) == -1) goto err;
-    /* Events with mask == AE_NONE are not set. So let's initialize the
-     * vector with it. */
+    /* Events with mask == AE_NONE are not set.
+     * So let's initialize the vector with it.
+     * AE_NONE 就是未初始化的意思， 初始化它为AE_NONE
+     * */
     for (i = 0; i < setsize; i++)
         eventLoop->events[i].mask = AE_NONE;
     return eventLoop;
