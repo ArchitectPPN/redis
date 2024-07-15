@@ -721,7 +721,15 @@ typedef struct readyList {
 } readyList;
 
 /* With multiplexing we need to take per-client state.
- * Clients are taken in a linked list. */
+ * Clients are taken in a linked list.
+ * 采用多路复用时，需管理各客户端状态，以链表形式组织客户端。
+ *
+ * 这段描述解释了在多路复用（multiplexing）的网络编程模型中，如何有效地跟踪和管理多个客户端的连接状态。
+ * 在多路复用技术中，如epoll或kqueue，单个线程或进程可以同时处理多个客户端的输入输出操作，而无需为每个客户端创建独立的线程或进程，这大大提高了系统的并发能力和效率。
+ * 为了实现这一点，系统通常会使用链表或其他数据结构来组织和管理这些客户端的连接信息，包括但不限于客户端的套接字描述符、读写事件、缓冲区状态等。
+ * 这样，当有新的事件发生时，系统可以根据链表中的信息快速定位到对应的客户端，执行相应的操作，而无需遍历整个客户端集合。
+ * 这种设计使得系统能够高效地处理大量并发连接，同时保持较低的资源消耗。
+ * */
 typedef struct client {
     uint64_t id;            /* Client incremental unique ID. */
     int fd;                 /* Client socket. */

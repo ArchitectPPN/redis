@@ -1470,7 +1470,13 @@ void processInputBuffer(client *c) {
         if (c->argc == 0) {
             resetClient(c);
         } else {
-            /* Only reset the client when the command was executed. */
+            /*
+             * Only reset the client when the command was executed.
+             * 仅当命令被执行后才重置客户端
+             * 这句话的意思是在Redis的上下文中，只有当一个命令成功执行完毕之后，才会对客户端的状态进行重置，例如清空其缓冲区或恢复其初始状态。
+             * 这样可以确保在多命令序列（如管道）中正确地管理每个命令的执行环境。
+             *
+             * */
             if (processCommand(c) == C_OK) {
                 if (c->flags & CLIENT_MASTER && !(c->flags & CLIENT_MULTI)) {
                     /* Update the applied replication offset of our master. */

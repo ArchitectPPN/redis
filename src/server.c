@@ -2671,7 +2671,11 @@ int processCommand(client *c) {
     /* The QUIT command is handled separately. Normal command procs will
      * go through checking for replication and QUIT will cause trouble
      * when FORCE_REPLICATION is enabled and would be implemented in
-     * a regular command proc. */
+     * a regular command proc.
+     * QUIT 命令采取特殊处理方式。
+     * 普通命令处理过程会包含复制检查步骤，
+     * 而 QUIT 命令在 FORCE_REPLICATION 开启时可能引起问题，故不宜在常规命令处理器中直接处理。
+     * */
     if (!strcasecmp(c->argv[0]->ptr,"quit")) {
         addReply(c,shared.ok);
         c->flags |= CLIENT_CLOSE_AFTER_REPLY;
@@ -2679,7 +2683,9 @@ int processCommand(client *c) {
     }
 
     /* Now lookup the command and check ASAP about trivial error conditions
-     * such as wrong arity, bad command name and so forth. */
+     * such as wrong arity, bad command name and so forth.
+     * 接下来快速查找命令，并立即验证基本的错误情况，如参数个数不符、命令名错误等。
+     * */
     c->cmd = c->lastcmd = lookupCommand(c->argv[0]->ptr);
     if (!c->cmd) {
         flagTransaction(c);
@@ -2758,14 +2764,31 @@ int processCommand(client *c) {
 
         /* Save out_of_memory result at script start, otherwise if we check OOM
          * untill first write within script, memory used by lua stack and
-         * arguments might interfere. */
+         * arguments might interfere.
+         * 在脚本开始时保存内存不足(out_of_memory)的结果，
+         * 否则如果我们直到脚本内的首次写入才检查内存溢出(OOM)，
+         * 那么Lua栈和参数占用的内存可能会产生干扰。
+         *
+         * 这段描述强调了一个重要的编程实践：在脚本或程序开始执行时就检查内存状态，尤其是在资源受限的环境中。
+         * 这是因为随着脚本的运行，Lua虚拟机的栈和传递给脚本的参数会消耗一定的内存，这些内存消耗可能会导致原本不存在的内存不足错误。
+         * 因此，提前检查可以更准确地判断脚本执行前的内存状况，避免因运行时动态内存分配造成的误判。
+         * */
         if (c->cmd->proc == evalCommand || c->cmd->proc == evalShaCommand) {
             server.lua_oom = out_of_memory;
         }
     }
 
     /* Don't accept write commands if there are problems persisting on disk
-     * and if this is a master instance. */
+     * and if this is a master instance.
+     *
+     * 如果存在磁盘持久化问题，并且当前实例为主服务器，则不应接受写入命令。
+     * 若主节点遇到磁盘持久化故障，拒绝接收写操作。
+     *
+     * 这段描述指出了一种在分布式系统中常见的故障隔离策略。
+     * 当主服务器（master instance）遇到磁盘持久化问题时，为了避免数据丢失或不一致，系统应暂时禁止接收写入命令。
+     * 这样做可以防止在数据存储不稳定的情况下继续写入新数据，从而保护数据的完整性和一致性，直到问题得到解决。
+     * 这种机制通常与健康检查和故障恢复策略相结合，以提高系统的可靠性和稳定性。
+     * */
     int deny_write_type = writeCommandsDeniedByDiskError();
     if (deny_write_type != DISK_ERROR_TYPE_NONE &&
         server.masterhost == NULL &&
@@ -2784,7 +2807,15 @@ int processCommand(client *c) {
     }
 
     /* Don't accept write commands if there are not enough good slaves and
-     * user configured the min-slaves-to-write option. */
+     * user configured the min-slaves-to-write option.
+     * 如果可用的从服务器数量不足，并且用户配置了 min-slaves-to-write 选项，则不应接受写入命令。
+     *
+     * 这段描述体现了在分布式系统中一种保障数据安全和高可用性的策略。
+     * min-slaves-to-write 是一个配置选项，用于指定在执行写操作前至少需要有多少个健康的从服务器（slaves）。
+     * 这样做的目的是确保即使主服务器发生故障，从服务器也能及时接替工作，维持数据的完整性和服务的连续性。
+     * 如果当前活动的从服务器数量少于这个阈值，系统将拒绝执行写操作，以避免在低冗余状态下增加数据丢失的风险。
+     * 这种机制常用于数据库复制、缓存集群等场景中。
+     * */
     if (server.masterhost == NULL &&
         server.repl_min_slaves_to_write &&
         server.repl_min_slaves_max_lag &&
@@ -2797,7 +2828,17 @@ int processCommand(client *c) {
     }
 
     /* Don't accept write commands if this is a read only slave. But
-     * accept write commands if this is our master. */
+     * accept write commands if this is our master.
+     * 如果这是一个只读从服务器，则不应接受写入命令。但是，如果这是我们的主服务器，则应接受写入命令。
+     * 仅当为只读从节点时，禁用写操作；若为所属主节点，则允许写入。
+     *
+     * 这段描述反映了分布式系统中角色权限控制的基本原则。
+     * 在复制架构中，从服务器（slave）通常被配置为只读模式，以防止数据不一致，而所有写操作应当只在主服务器（master）上执行。
+     * 因此，当请求到达一个节点时，首先需要判断该节点的角色：
+     * 如果是只读从服务器，那么任何写入命令都将被拒绝，以维护数据的一致性和完整性。
+     * 如果是主服务器，那么写入命令是被允许的，因为它是负责数据写入和更新的核心节点。
+     * 这样的设计确保了数据的正确性和系统的稳定性，同时还能通过从服务器提供读取服务，实现负载均衡和高可用性。
+     * */
     if (server.masterhost && server.repl_slave_ro &&
         !(c->flags & CLIENT_MASTER) &&
         c->cmd->flags & CMD_WRITE)
@@ -2806,7 +2847,16 @@ int processCommand(client *c) {
         return C_OK;
     }
 
-    /* Only allow SUBSCRIBE and UNSUBSCRIBE in the context of Pub/Sub */
+    /*
+     * Only allow SUBSCRIBE and UNSUBSCRIBE in the context of Pub/Sub
+     * 仅在发布/订阅（Pub/Sub）上下文中允许 SUBSCRIBE 和 UNSUBSCRIBE 操作。
+     * 仅在Pub/Sub模式下支持SUBSCRIBE和UNSUBSCRIBE指令。
+     *
+     * 这段描述强调了在实现发布/订阅（Publish/Subscribe，简称Pub/Sub）功能的系统中，如Redis，特定的命令（如SUBSCRIBE和UNSUBSCRIBE）只能在相应的上下文中使用。
+     * 在Pub/Sub模式下，客户端可以订阅频道以接收消息，也可以取消订阅。
+     * 为了保证系统的稳定性和一致性，通常会限制这些命令的使用范围，确保它们只在适当的场景下被调用，避免与其他操作混淆或产生冲突。
+     * 这种设计有助于维护系统的清晰度和可预测性，同时也提高了安全性。
+     * */
     if (c->flags & CLIENT_PUBSUB &&
         c->cmd->proc != pingCommand &&
         c->cmd->proc != subscribeCommand &&
@@ -2818,8 +2868,16 @@ int processCommand(client *c) {
     }
 
     /* Only allow commands with flag "t", such as INFO, SLAVEOF and so on,
-     * when slave-serve-stale-data is no and we are a slave with a broken
-     * link with master. */
+     * when slave-serve-stale-data is no and we are a slave with a broken link with master.
+     * 当 slave-serve-stale-data 设置为否，并且我们是一个与主服务器连接中断的从服务器时，只允许执行带有 "t" 标志的命令，例如 INFO、SLAVEOF 等。
+     * 在 slave-serve-stale-data 关闭且为断连从节点时，仅许可标记为 "t" 的命令，如 INFO、SLAVEOF 等。
+     *
+     * 这段描述指出了一种在分布式系统中处理从服务器（slave）数据同步中断情况下的命令执行策略。
+     * 当从服务器与主服务器（master）的连接断开，且配置项 slave-serve-stale-data 被设置为禁用时，从服务器不应提供可能返回过期数据的服务。
+     * 此时，系统只允许执行那些不会影响数据一致性的命令，即带有 "t" 标志的命令，例如 INFO（获取服务器信息）、SLAVEOF（重新配置复制关系）等。
+     * 这些命令通常用于监控、管理和配置，而不是修改数据。
+     * 这种限制有助于在数据同步失败时，防止向用户提供可能不准确的信息，同时保持系统的基本管理功能可用。
+     * */
     if (server.masterhost && server.repl_state != REPL_STATE_CONNECTED &&
         server.repl_serve_stale_data == 0 &&
         !(c->cmd->flags & CMD_STALE))
@@ -2829,14 +2887,31 @@ int processCommand(client *c) {
         return C_OK;
     }
 
-    /* Loading DB? Return an error if the command has not the
-     * CMD_LOADING flag. */
+    /* Loading DB? Return an error if the command has not the CMD_LOADING flag.
+     * 正在加载数据库？如果命令没有 CMD_LOADING 标志，则返回错误。
+     * 数据库加载中？若命令未携带 CMD_LOADING 标记，抛出错误。
+     *
+     * 这段描述表明在系统初始化或数据库加载过程中，对于某些特定的命令，需要有特殊的标志（CMD_LOADING）才能执行。
+     * 在数据库加载期间，系统可能处于不稳定状态，数据结构尚未完全构建完成，此时执行某些命令可能会导致数据损坏或系统崩溃。
+     * 因此，为了确保系统安全和数据一致性，只有那些带有 CMD_LOADING 标志的命令才被允许执行，这些命令通常是用于监控加载进度、查询系统状态等不影响数据结构的操作。
+     * 其他命令则会被拒绝执行，以避免潜在的风险。
+     * 这种机制是系统初始化和数据加载阶段常见的一种安全防护措施。
+     *
+     * */
     if (server.loading && !(c->cmd->flags & CMD_LOADING)) {
         addReply(c, shared.loadingerr);
         return C_OK;
     }
 
-    /* Lua script too slow? Only allow a limited number of commands. */
+    /* Lua script too slow? Only allow a limited number of commands.
+     * Lua 脚本运行缓慢？限制可执行命令的数量。
+     *
+     * 这段描述反映了一种在系统中控制 Lua 脚本执行时间或资源消耗的策略。
+     * 当 Lua 脚本执行时间过长，可能会占用过多的系统资源，影响系统的响应速度和其他任务的正常运行。
+     * 为了防止这种情况，可以设置一个命令执行的上限，一旦达到这个上限，系统就会拒绝执行更多的命令，直到当前的 Lua 脚本执行完成或被中断。
+     * 这种机制有助于保护系统免受长时间运行的脚本带来的负面影响，确保系统的稳定性和性能。
+     * 通常，这种限制可以通过配置参数来调整，以便根据具体的应用场景和资源状况灵活控制。
+     * */
     if (server.lua_timedout &&
           c->cmd->proc != authCommand &&
           c->cmd->proc != replconfCommand &&
