@@ -732,7 +732,10 @@ static void acceptCommonHandler(int fd, int flags, char *ip) {
 }
 
 void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
+    // 这里的命名c应该代表client,表示客户端的端口,客户端的fd
+    // MAX_ACCEPTS_PER_CALL 每次最多处理多少个连接
     int cport, cfd, max = MAX_ACCEPTS_PER_CALL;
+    // IP字符串
     char cip[NET_IP_STR_LEN];
     UNUSED(el);
     UNUSED(mask);

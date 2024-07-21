@@ -1007,7 +1007,7 @@ struct redisServer {
     mode_t unixsocketperm;      /* UNIX socket permission */
 	/*
 	 * TCP socket file descriptors
-	 * TCP套接字文件描述符
+	 * TCP套接字文件描述符, 这里看起来应该是监听套接字数组
 	 */
     int ipfd[CONFIG_BINDADDR_MAX];
 	/*

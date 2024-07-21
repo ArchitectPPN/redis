@@ -151,10 +151,15 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
 
     if (aeApiAddEvent(eventLoop, fd, mask) == -1)
         return AE_ERR;
+    // 这里默认是AE_NONE, 然后执行或操作符时可以表示为AE_READABLE | AE_WRITABLE | AE_BARRIER
     fe->mask |= mask;
+
+    // proc回调在这里看起来, 可以支持读写
     if (mask & AE_READABLE) fe->rfileProc = proc;
     if (mask & AE_WRITABLE) fe->wfileProc = proc;
+    // 添加事件时的额外客户端参数
     fe->clientData = clientData;
+
     if (fd > eventLoop->maxfd)
         eventLoop->maxfd = fd;
     return AE_OK;
@@ -374,7 +379,8 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
      * events, in order to sleep until the next time event is ready
      * to fire. */
     if (eventLoop->maxfd != -1 ||
-        ((flags & AE_TIME_EVENTS) && !(flags & AE_DONT_WAIT))) {
+        ((flags & AE_TIME_EVENTS) && !(flags & AE_DONT_WAIT)) // 触发时间事件且不希望等待
+    ) {
         int j;
         aeTimeEvent *shortest = NULL;
         struct timeval tv, *tvp;
@@ -400,7 +406,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
                 tvp->tv_sec = 0;
                 tvp->tv_usec = 0;
             }
-        } else {
+        } else  {
             /* If we have to check for events but need to return
              * ASAP because of AE_DONT_WAIT we need to set the timeout
              * to zero */
@@ -457,6 +463,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 
             /* Fire the writable event. */
             if (fe->mask & mask & AE_WRITABLE) {
+                // fe->wfileProc != fe->rfileProc 防止同时触发
                 if (!fired || fe->wfileProc != fe->rfileProc) {
                     fe->wfileProc(eventLoop,fd,fe->clientData,mask);
                     fired++;

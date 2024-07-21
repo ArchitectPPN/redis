@@ -2156,7 +2156,9 @@ void initServer(void) {
         listenToPort(server.port,server.ipfd,&server.ipfd_count) == C_ERR)
         exit(1);
 
-    /* Open the listening Unix domain socket. */
+    /* Open the listening Unix domain socket.
+     * 打开监听的Unix域套接字。
+     * */
     if (server.unixsocket != NULL) {
         unlink(server.unixsocket); /* don't care if this fails */
         server.sofd = anetUnixServer(server.neterr,server.unixsocket,
@@ -2174,7 +2176,9 @@ void initServer(void) {
         exit(1);
     }
 
-    /* Create the Redis databases, and initialize other internal state. */
+    /* Create the Redis databases, and initialize other internal state.
+     * 创建Redis数据库，并初始化其他内部状态。
+     * */
     for (j = 0; j < server.dbnum; j++) {
         server.db[j].dict = dictCreate(&dbDictType,NULL);
         server.db[j].expires = dictCreate(&keyptrDictType,NULL);
@@ -2234,7 +2238,12 @@ void initServer(void) {
         exit(1);
     }
 
-    /* Create an event handler for accepting new connections in TCP and Unix domain sockets. */
+    /* Create an event handler for accepting new connections in TCP and Unix domain sockets.
+     * 为TCP和Unix域套接字创建一个事件处理器以接受新的连接。
+     *
+     * 你需要设计并实现一个事件处理器（通常是回调函数或者事件循环的一部分），这个处理器能够响应并处理在TCP（传输控制协议）和Unix域套接字上的新连接请求。
+     * 当有新的连接尝试时，事件处理器会被触发，从而允许服务器端代码去接受这个连接，与客户端建立通信。
+     * */
     for (j = 0; j < server.ipfd_count; j++) {
         if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
             acceptTcpHandler,NULL) == AE_ERR)
