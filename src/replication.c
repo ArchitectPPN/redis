@@ -46,10 +46,15 @@ int cancelReplicationHandshake(void);
 
 /* --------------------------- Utility functions ---------------------------- */
 
-/* Return the pointer to a string representing the slave ip:listening_port
- * pair. Mostly useful for logging, since we want to log a slave using its
+/* Return the pointer to a string representing the slave ip:listening_port pair.
+ * Mostly useful for logging, since we want to log a slave using its
  * IP address and its listening port which is more clear for the user, for
- * example: "Closing connection with replica 10.1.2.3:6380". */
+ * example: "Closing connection with replica 10.1.2.3:6380".
+ *
+ * 返回指向字符串的指针，该字符串表示从属节点（slave）的 IP 地址与监听端口组合。
+ * 这主要用于日志记录，因为我们希望使用从属节点的 IP 地址和监听端口来记录它，这对用户来说更清晰，例如：
+ * "Closing connection with replica 10.1.2.3:6380".
+ * */
 char *replicationGetSlaveName(client *c) {
     static char buf[NET_PEER_ID_LEN];
     char ip[NET_IP_STR_LEN];
@@ -273,8 +278,9 @@ void replicationFeedSlaves(list *slaves, int dictid, robj **argv, int argc) {
     }
 }
 
-/* This function is used in order to proxy what we receive from our master
- * to our sub-slaves. */
+/* This function is used in order to proxy what we receive from our master to our sub-slaves.
+ * 此函数用于将从主节点接收到的数据代理转发给子从属节点。
+ * */
 #include <ctype.h>
 void replicationFeedSlavesFromMasterStream(list *slaves, char *buf, size_t buflen) {
     listNode *ln;
@@ -1950,6 +1956,7 @@ int connectWithMaster(void) {
 void undoConnectWithMaster(void) {
     int fd = server.repl_transfer_s;
 
+    // 删除对应的事件，关闭fd
     aeDeleteFileEvent(server.el,fd,AE_READABLE|AE_WRITABLE);
     close(fd);
     server.repl_transfer_s = -1;
@@ -1973,7 +1980,12 @@ void replicationAbortSyncTransfer(void) {
  * If there was a replication handshake in progress 1 is returned and
  * the replication state (server.repl_state) set to REPL_STATE_CONNECT.
  *
- * Otherwise zero is returned and no operation is perforemd at all. */
+ * Otherwise zero is returned and no operation is perforemd at all.
+ *
+ * 此函数如果正在进行非阻塞复制尝试，则终止该尝试，通过取消非阻塞连接尝试或初始的大块数据传输。
+ * 如果正在进行复制握手，则返回 1 并将复制状态（server.repl_state）设置为 REPL_STATE_CONNECT。
+ * 否则返回 0 并且不执行任何操作。
+ * */
 int cancelReplicationHandshake(void) {
     if (server.repl_state == REPL_STATE_TRANSFER) {
         replicationAbortSyncTransfer();
@@ -1989,24 +2001,38 @@ int cancelReplicationHandshake(void) {
     return 1;
 }
 
-/* Set replication to the specified master address and port. */
+/* Set replication to the specified master address and port.
+ * 设置复制到指定的主节点地址和端口。
+ * */
 void replicationSetMaster(char *ip, int port) {
     int was_master = server.masterhost == NULL;
 
+    // 释放旧的主节点ip地址
     sdsfree(server.masterhost);
     server.masterhost = sdsnew(ip);
     server.masterport = port;
+    // 如果当前实例已经连接到了一个主节点，则释放与该主节点关联的客户端连接。
     if (server.master) {
         freeClient(server.master);
     }
+    // 断开所有被阻塞在当前实例上的客户端连接。
+    // 这是因为当前实例即将转变为从属节点，这些客户端连接需要被清理。
     disconnectAllBlockedClients(); /* Clients blocked in master, now slave. */
 
     /* Force our slaves to resync with us as well. They may hopefully be able
-     * to partially resync with us, but we can notify the replid change. */
+     * to partially resync with us, but we can notify the replid change.
+     * 强制当前实例的所有从属节点重新同步。
+     * 这通常意味着断开与所有从属节点的连接，并取消正在进行的复制握手过程。
+     * 这样做是为了确保所有从属节点都能正确地与新的主节点同步。
+     * */
     disconnectSlaves();
     cancelReplicationHandshake();
     /* Before destroying our master state, create a cached master using
-     * our own parameters, to later PSYNC with the new master. */
+     * our own parameters, to later PSYNC with the new master.
+     *
+     * 如果当前实例之前是主节点，那么在销毁主节点状态之前，创建一个缓存的主节点，使用当前实例自身的参数。
+     * 这是为了之后能够与新的主节点进行部分同步（PSYNC）。
+     *  */
     if (was_master) {
         replicationDiscardCachedMaster();
         replicationCacheMasterUsingMyself();
@@ -2014,15 +2040,19 @@ void replicationSetMaster(char *ip, int port) {
     server.repl_state = REPL_STATE_CONNECT;
 }
 
-/* Cancel replication, setting the instance as a master itself. */
+/* Cancel replication, setting the instance as a master itself.
+ * 取消复制，并将实例设置为主节点自身。
+ * */
 void replicationUnsetMaster(void) {
-    if (server.masterhost == NULL) return; /* Nothing to do. */
+    /* Nothing to do. */
+    if (server.masterhost == NULL) return;
     sdsfree(server.masterhost);
     server.masterhost = NULL;
     /* When a slave is turned into a master, the current replication ID
      * (that was inherited from the master at synchronization time) is
      * used as secondary ID up to the current offset, and a new replication
-     * ID is created to continue with a new replication history. */
+     * ID is created to continue with a new replication history.
+     * */
     shiftReplicationId();
     if (server.master) freeClient(server.master);
     replicationDiscardCachedMaster();
@@ -2067,7 +2097,9 @@ void replicaofCommand(client *c) {
     }
 
     /* The special host/port combination "NO" "ONE" turns the instance
-     * into a master. Otherwise the new master address is set. */
+     * into a master. Otherwise the new master address is set.
+     * 特殊的主机/端口组合 "NO" "ONE" 会将实例转换为主节点。否则，将设置新的主节点地址。
+     * */
     if (!strcasecmp(c->argv[1]->ptr,"no") &&
         !strcasecmp(c->argv[2]->ptr,"one")) {
         if (server.masterhost) {
@@ -2078,13 +2110,24 @@ void replicaofCommand(client *c) {
             sdsfree(client);
         }
     } else {
+        // 使用 long 类型来存储端口号可能是因为以下原因之一：
+        // 兼容性和可移植性:
+        // 为了确保端口号能够适应所有平台，即使某些平台上的 int 可能不够大或为负值，long 类型可以保证有足够的空间且通常为正数。
+        // 避免溢出:
+        // 如果在计算或转换过程中涉及到较大的数字，使用 long 可以减少溢出的风险。
+        // 代码一致性:
+        // 如果项目中其他地方已经使用了 long 类型来表示端口，那么为了保持代码的一致性，这里也使用 long。
+        // API 要求:
+        // 某些系统调用或库函数可能要求端口使用 long 类型。
         long port;
 
         if (c->flags & CLIENT_SLAVE)
         {
             /* If a client is already a replica they cannot run this command,
              * because it involves flushing all replicas (including this
-             * client) */
+             * client)
+             * 如果一个客户端已经是从属节点（replica），则不能运行此命令，因为该命令涉及清除所有从属节点（包括这个客户端）。
+             * */
             addReplyError(c, "Command is not valid when client is a replica.");
             return;
         }
@@ -2092,7 +2135,11 @@ void replicaofCommand(client *c) {
         if ((getLongFromObjectOrReply(c, c->argv[2], &port, NULL) != C_OK))
             return;
 
-        /* Check if we are already attached to the specified slave */
+        /*
+         * Check if we are already attached to the specified slave
+         * 检查是否已经连接到指定的从属节点（slave）。
+         */
+         * /
         if (server.masterhost && !strcasecmp(server.masterhost,c->argv[1]->ptr)
             && server.masterport == port) {
             serverLog(LL_NOTICE,"REPLICAOF would result into synchronization with the master we are already connected with. No operation performed.");
@@ -2100,7 +2147,8 @@ void replicaofCommand(client *c) {
             return;
         }
         /* There was no previous master or the user specified a different one,
-         * we can continue. */
+         * we can continue.
+         * */
         replicationSetMaster(c->argv[1]->ptr, port);
         sds client = catClientInfoString(sdsempty(),c);
         serverLog(LL_NOTICE,"REPLICAOF %s:%d enabled (user request from '%s')",
@@ -2578,7 +2626,9 @@ long long replicationGetSlaveOffset(void) {
 void replicationCron(void) {
     static long long replication_cron_loops = 0;
 
-    /* Non blocking connection timeout? */
+    /* Non blocking connection timeout?
+     * 超时处理
+     * */
     if (server.masterhost &&
         (server.repl_state == REPL_STATE_CONNECTING ||
          slaveIsInHandshakeState()) &&
@@ -2588,7 +2638,10 @@ void replicationCron(void) {
         cancelReplicationHandshake();
     }
 
-    /* Bulk transfer I/O timeout? */
+    /*
+     * Bulk transfer I/O timeout?
+     *
+     */
     if (server.masterhost && server.repl_state == REPL_STATE_TRANSFER &&
         (time(NULL)-server.repl_transfer_lastio) > server.repl_timeout)
     {
@@ -2596,7 +2649,10 @@ void replicationCron(void) {
         cancelReplicationHandshake();
     }
 
-    /* Timed out master when we are an already connected slave? */
+    /*
+     * Timed out master when we are an already connected slave?
+     *
+     */
     if (server.masterhost && server.repl_state == REPL_STATE_CONNECTED &&
         (time(NULL)-server.master->lastinteraction) > server.repl_timeout)
     {
