@@ -1927,24 +1927,25 @@ write_error: /* Handle sendSynchronousCommand(SYNC_CMD_WRITE) errors. */
 int connectWithMaster(void) {
     int fd;
 
-    fd = anetTcpNonBlockBestEffortBindConnect(NULL,
-        server.masterhost,server.masterport,NET_FIRST_BIND_ADDR);
+    // 连接master
+    fd = anetTcpNonBlockBestEffortBindConnect(NULL,server.masterhost,server.masterport,NET_FIRST_BIND_ADDR);
     if (fd == -1) {
         serverLog(LL_WARNING,"Unable to connect to MASTER: %s",
             strerror(errno));
         return C_ERR;
     }
 
-    if (aeCreateFileEvent(server.el,fd,AE_READABLE|AE_WRITABLE,syncWithMaster,NULL) ==
-            AE_ERR)
-    {
+    // 创建ae事件, 后续有消息时, 会触发syncWithMaster
+    if (aeCreateFileEvent(server.el,fd,AE_READABLE|AE_WRITABLE,syncWithMaster,NULL) == AE_ERR) {
         close(fd);
         serverLog(LL_WARNING,"Can't create readable event for SYNC");
         return C_ERR;
     }
 
+    // 更新
     server.repl_transfer_lastio = server.unixtime;
     server.repl_transfer_s = fd;
+    // 更新为连接中
     server.repl_state = REPL_STATE_CONNECTING;
     return C_OK;
 }
@@ -1990,9 +1991,7 @@ int cancelReplicationHandshake(void) {
     if (server.repl_state == REPL_STATE_TRANSFER) {
         replicationAbortSyncTransfer();
         server.repl_state = REPL_STATE_CONNECT;
-    } else if (server.repl_state == REPL_STATE_CONNECTING ||
-               slaveIsInHandshakeState())
-    {
+    } else if (server.repl_state == REPL_STATE_CONNECTING || slaveIsInHandshakeState()) {
         undoConnectWithMaster();
         server.repl_state = REPL_STATE_CONNECT;
     } else {
@@ -2662,8 +2661,7 @@ void replicationCron(void) {
 
     /* Check if we should connect to a MASTER */
     if (server.repl_state == REPL_STATE_CONNECT) {
-        serverLog(LL_NOTICE,"Connecting to MASTER %s:%d",
-            server.masterhost, server.masterport);
+        serverLog(LL_NOTICE,"Connecting to MASTER %s:%d", server.masterhost, server.masterport);
         if (connectWithMaster() == C_OK) {
             serverLog(LL_NOTICE,"MASTER <-> REPLICA sync started");
         }
@@ -2672,8 +2670,11 @@ void replicationCron(void) {
     /* Send ACK to master from time to time.
      * Note that we do not send periodic acks to masters that don't
      * support PSYNC and replication offsets. */
-    if (server.masterhost && server.master &&
-        !(server.master->flags & CLIENT_PRE_PSYNC))
+    if (
+            server.masterhost
+        && server.master
+        && !(server.master->flags & CLIENT_PRE_PSYNC)
+    )
         replicationSendAck();
 
     /* If we have attached slaves, PING them from time to time.

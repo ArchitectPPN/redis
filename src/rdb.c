@@ -1071,6 +1071,13 @@ ssize_t rdbSaveAuxFieldStrInt(rio *rdb, char *key, long long val) {
 
 /* Save a few default AUX fields with information about the RDB generated. */
 int rdbSaveInfoAuxFields(rio *rdb, int flags, rdbSaveInfo *rsi) {
+    // 这段代码可以用来判断当前系统架构是64位还是32位。
+    // sizeof(void*)返回的是void*（即通用指针类型）的大小，单位是字节。
+    // 在32位系统上，指针通常是32位长，因此sizeof(void*)会返回4；
+    // 而在64位系统上，指针通常是64位长，因此sizeof(void*)会返回8。
+    // 这是一个常见的技巧，用于编写可移植的代码，可以根据编译器和运行环境的不同自动调整行为。
+    // 在实际应用中，你可能会看到类似这样的完整条件表达式被用于设置一个宏定义或者配置变量，比如：
+    // #define SYSTEM_BIT ((sizeof(void*) == 8) ? 64 : 32)
     int redis_bits = (sizeof(void*) == 8) ? 64 : 32;
     int aof_preamble = (flags & RDB_SAVE_AOF_PREAMBLE) != 0;
 
@@ -1157,7 +1164,9 @@ int rdbSaveRio(rio *rdb, int *error, int flags, rdbSaveInfo *rsi) {
     if (rdbSaveInfoAuxFields(rdb,flags,rsi) == -1) goto werr;
     if (rdbSaveModulesAux(rdb, REDISMODULE_AUX_BEFORE_RDB) == -1) goto werr;
 
+    // 遍历每个数据库
     for (j = 0; j < server.dbnum; j++) {
+        // 这种写法是访问db里面的第j个下标的元素
         redisDb *db = server.db+j;
         dict *d = db->dict;
         if (dictSize(d) == 0) continue;
@@ -1170,7 +1179,8 @@ int rdbSaveRio(rio *rdb, int *error, int flags, rdbSaveInfo *rsi) {
         /* Write the RESIZE DB opcode. We trim the size to UINT32_MAX, which
          * is currently the largest type we are able to represent in RDB sizes.
          * However this does not limit the actual size of the DB to load since
-         * these sizes are just hints to resize the hash tables. */
+         * these sizes are just hints to resize the hash tables.
+         * */
         uint64_t db_size, expires_size;
         db_size = dictSize(db->dict);
         expires_size = dictSize(db->expires);
