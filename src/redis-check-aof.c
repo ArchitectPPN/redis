@@ -162,6 +162,11 @@ int redis_check_aof_main(int argc, char **argv) {
         exit(1);
     }
 
+    // 这段代码使用fopen函数以读写模式(r+)打开名为filename的文件。
+    // fopen是C风格的文件操作函数，在C++中也可使用。
+    // r+模式表示文件会被打开用于读写，并且文件指针会定位在文件开始位置。
+    // 返回一个指向FILE结构的指针赋值给fp，用于后续文件操作。
+    // 如果文件无法打开，fopen将返回NULL。
     FILE *fp = fopen(filename,"r+");
     if (fp == NULL) {
         printf("Cannot open file: %s\n", filename);
@@ -184,8 +189,11 @@ int redis_check_aof_main(int argc, char **argv) {
      * is the case, start processing the RDB part. */
     if (size >= 8) {    /* There must be at least room for the RDB header. */
         char sig[5];
+        // 这个函数的功能是判断文件中是否存在指定的前导码（preamble）。
+        // 用memcmp函数比较了两个字符串"REDIS"和sig的前sizeof(sig)个字符是否相等。如果相等，返回0；如果不相等，返回一个非零值。
         int has_preamble = fread(sig,sizeof(sig),1,fp) == 1 &&
                             memcmp(sig,"REDIS",sizeof(sig)) == 0;
+        // 这行代码的功能是将文件指针 fp 重置到文件的开始位置。
         rewind(fp);
         if (has_preamble) {
             printf("The AOF appears to start with an RDB preamble.\n"
@@ -204,6 +212,7 @@ int redis_check_aof_main(int argc, char **argv) {
     printf("AOF analyzed: size=%lld, ok_up_to=%lld, diff=%lld\n",
         (long long) size, (long long) pos, (long long) diff);
     if (diff > 0) {
+        // 带了--fix参数，会尝试修复AOF文件。
         if (fix) {
             char buf[2];
             printf("This will shrink the AOF from %lld bytes, with %lld bytes, to %lld bytes\n",(long long)size,(long long)diff,(long long)pos);
