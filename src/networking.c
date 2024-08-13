@@ -1182,7 +1182,13 @@ void unprotectClient(client *c) {
  * is ready to be executed, or C_ERR if there is still protocol to read to
  * have a well formed command. The function also returns C_ERR when there is
  * a protocol error: in such a case the client structure is setup to reply
- * with the error and close the connection. */
+ * with the error and close the connection.
+ *
+ * 类似于 processMultibulkBuffer()，但针对的是内联协议而不是 RESP，
+ * 此函数消耗客户端查询缓冲区并创建一个准备执行的命令，并将其存储在客户端结构中。
+ * 如果命令准备好执行则返回 C_OK，如果还需要读取更多协议数据以形成一个有效的命令则返回 C_ERR。
+ * 当出现协议错误时，函数同样返回 C_ERR：在这种情况下，客户端结构会被设置以回复错误并关闭连接。
+ * */
 int processInlineBuffer(client *c) {
     char *newline;
     int argc, j, linefeed_chars = 1;
@@ -1190,11 +1196,12 @@ int processInlineBuffer(client *c) {
     size_t querylen;
 
     /* Search for end of line */
+    // strchr 是一个 C 语言标准库函数，用于在一个字符串中查找给定字符的第一个匹配位置。
     newline = strchr(c->querybuf+c->qb_pos,'\n');
 
     /* Nothing to do without a \r\n */
     if (newline == NULL) {
-        if (sdslen(c->querybuf)-c->qb_pos > PROTO_INLINE_MAX_SIZE) {
+        if (sdslen(c->querybuf) - c->qb_pos > PROTO_INLINE_MAX_SIZE) {
             addReplyError(c,"Protocol error: too big inline request");
             setProtocolError("too big inline request",c);
         }
@@ -1205,7 +1212,9 @@ int processInlineBuffer(client *c) {
     if (newline && newline != c->querybuf+c->qb_pos && *(newline-1) == '\r')
         newline--, linefeed_chars++;
 
-    /* Split the input buffer up to the \r\n */
+    /* Split the input buffer up to the \r\n
+     * 将输入缓冲区分割到 \r\n 为止。
+     * */
     querylen = newline-(c->querybuf+c->qb_pos);
     aux = sdsnewlen(c->querybuf+c->qb_pos,querylen);
     argv = sdssplitargs(aux,&argc);
@@ -1217,21 +1226,31 @@ int processInlineBuffer(client *c) {
     }
 
     /* Newline from slaves can be used to refresh the last ACK time.
-     * This is useful for a slave to ping back while loading a big
-     * RDB file. */
+     * This is useful for a slave to ping back while loading a big RDB file.
+     *
+     * 从从属节点接收的新行可以用来更新最后确认的时间。
+     * 这对于从属节点在加载大型 RDB 文件时回传 ping 操作非常有用。
+     * */
     if (querylen == 0 && getClientType(c) == CLIENT_TYPE_SLAVE)
         c->repl_ack_time = server.unixtime;
 
-    /* Move querybuffer position to the next query in the buffer. */
+    /*
+     * Move querybuffer position to the next query in the buffer.
+     * 将查询缓冲区的位置移动到缓冲区中的下一个查询。
+     * */
     c->qb_pos += querylen+linefeed_chars;
 
-    /* Setup argv array on client structure */
+    /* Setup argv array on client structure
+     * 在客户端结构中设置 argv 数组。
+     * */
     if (argc) {
         if (c->argv) zfree(c->argv);
         c->argv = zmalloc(sizeof(robj*)*argc);
     }
 
-    /* Create redis objects for all arguments. */
+    /* Create redis objects for all arguments.
+     * 为所有参数创建 Redis 对象。
+     * */
     for (c->argc = 0, j = 0; j < argc; j++) {
         c->argv[c->argc] = createObject(OBJ_STRING,argv[j]);
         c->argc++;
@@ -1427,32 +1446,57 @@ int processMultibulkBuffer(client *c) {
 /* This function is called every time, in the client structure 'c', there is
  * more query buffer to process, because we read more data from the socket
  * or because a client was blocked and later reactivated, so there could be
- * pending query buffer, already representing a full command, to process. */
+ * pending query buffer, already representing a full command, to process.
+ *
+ * 此函数每次都会被调用，在客户端结构 c 中可能存在更多的查询缓冲区需要处理，
+ * 因为从套接字读取了更多数据或者客户端之前被阻塞后来又被重新激活，
+ * 因此可能存在待处理的查询缓冲区，这些缓冲区已经代表了一个完整的命令。
+ *
+ * pending query buffer, already representing a full command, to process.
+ * 待处理的查询缓冲区，已经代表了一个完整的命令，需要进行处理。
+ * */
 void processInputBuffer(client *c) {
     server.current_client = c;
 
-    /* Keep processing while there is something in the input buffer */
+    /* Keep processing while there is something in the input buffer
+     * 只要输入缓冲区中有数据，就继续处理。
+     * */
     while(c->qb_pos < sdslen(c->querybuf)) {
-        /* Return if clients are paused. */
+        /* Return if clients are paused.
+         * 如果客户端已暂停，则返回。
+         * */
         if (!(c->flags & CLIENT_SLAVE) && clientsArePaused()) break;
 
-        /* Immediately abort if the client is in the middle of something. */
+        /*
+         * Immediately abort if the client is in the middle of something.
+         * 如果客户端正在进行某个操作，则立即终止。
+         * */
         if (c->flags & CLIENT_BLOCKED) break;
 
         /* Don't process input from the master while there is a busy script
          * condition on the slave. We want just to accumulate the replication
          * stream (instead of replying -BUSY like we do with other clients) and
-         * later resume the processing. */
+         * later resume the processing.
+         *
+         * 当从属节点存在繁忙脚本条件时，不要处理来自主节点的输入。
+         * 我们希望仅仅积累复制流（而不是像对其他客户端那样回复 -BUSY）并且稍后恢复处理。
+         * */
         if (server.lua_timedout && c->flags & CLIENT_MASTER) break;
 
         /* CLIENT_CLOSE_AFTER_REPLY closes the connection once the reply is
          * written to the client. Make sure to not let the reply grow after
          * this flag has been set (i.e. don't process more commands).
+         * CLIENT_CLOSE_AFTER_REPLY 标志会在回复被写入客户端后关闭连接。
+         * 确保在设置了这个标志之后不再让回复增长（即不要处理更多的命令）。
          *
-         * The same applies for clients we want to terminate ASAP. */
+         * The same applies for clients we want to terminate ASAP.
+         * 同样的规则适用于我们想要尽快终止的客户端。
+         * */
         if (c->flags & (CLIENT_CLOSE_AFTER_REPLY|CLIENT_CLOSE_ASAP)) break;
 
-        /* Determine request type when unknown. */
+        /* Determine request type when unknown.
+         * 当请求类型未知时确定其类型。
+         * */
         if (!c->reqtype) {
             if (c->querybuf[c->qb_pos] == '*') {
                 c->reqtype = PROTO_REQ_MULTIBULK;
@@ -1469,7 +1513,9 @@ void processInputBuffer(client *c) {
             serverPanic("Unknown request type");
         }
 
-        /* Multibulk processing could see a <= 0 length. */
+        /* Multibulk processing could see a <= 0 length.
+         * 多块批量处理可能会遇到长度小于等于 0 的情况。
+         * */
         if (c->argc == 0) {
             resetClient(c);
         } else {
@@ -1495,7 +1541,11 @@ void processInputBuffer(client *c) {
             }
             /* freeMemoryIfNeeded may flush slave output buffers. This may
              * result into a slave, that may be the active client, to be
-             * freed. */
+             * freed.
+             *
+             * freeMemoryIfNeeded 可能会刷新从属节点的输出缓冲区。
+             * 这可能导致一个从属节点（可能是当前活动的客户端）被释放。
+             * */
             if (server.current_client == NULL) break;
         }
     }

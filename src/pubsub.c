@@ -223,6 +223,7 @@ int pubsubUnsubscribeAllPatterns(client *c, int notify) {
 
 /* Publish a message */
 int pubsubPublishMessage(robj *channel, robj *message) {
+    // 初始化接收者数量
     int receivers = 0;
     dictEntry *de;
     listNode *ln;
