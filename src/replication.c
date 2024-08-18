@@ -88,7 +88,9 @@ void createReplicationBacklog(void) {
 
     /* We don't have any data inside our buffer, but virtually the first
      * byte we have is the next byte that will be generated for the
-     * replication stream. */
+     * replication stream.
+	 * 我们的缓冲区中没有任何数据，但实际上所谓的第一个字节是指接下来将为复制流生成的字节。
+	 */
     server.repl_backlog_off = server.master_repl_offset+1;
 }
 
@@ -138,18 +140,29 @@ void feedReplicationBacklog(void *ptr, size_t len) {
      * iteration and rewind the "idx" index if we reach the limit. */
     while(len) {
         size_t thislen = server.repl_backlog_size - server.repl_backlog_idx;
+        // 如果剩余的空间大于要写入的数据长度，thislen覆盖为len
         if (thislen > len) thislen = len;
+        // 将数据写入到缓冲区
         memcpy(server.repl_backlog+server.repl_backlog_idx,p,thislen);
+        // 更新下次写入的位置
         server.repl_backlog_idx += thislen;
+        // 如果缓冲区已经写满，下次写入位置重置为0（从头开始）
         if (server.repl_backlog_idx == server.repl_backlog_size)
             server.repl_backlog_idx = 0;
+        // 更新字符串长度
         len -= thislen;
+        // 字符串指针向后移动
         p += thislen;
+        // 更新已写入的长度
         server.repl_backlog_histlen += thislen;
     }
+    // 已写入的长度大于总长度， 将写入长度更新为总长度， 确保写入长度不会超出总长度
     if (server.repl_backlog_histlen > server.repl_backlog_size)
         server.repl_backlog_histlen = server.repl_backlog_size;
-    /* Set the offset of the first byte we have in the backlog. */
+
+    /* Set the offset of the first byte we have in the backlog.
+     * 设置我们在缓冲区中的第一个字节的偏移量。
+     **/
     server.repl_backlog_off = server.master_repl_offset -
                               server.repl_backlog_histlen + 1;
 }
