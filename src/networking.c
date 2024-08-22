@@ -1199,7 +1199,9 @@ int processInlineBuffer(client *c) {
     // strchr 是一个 C 语言标准库函数，用于在一个字符串中查找给定字符的第一个匹配位置。
     newline = strchr(c->querybuf+c->qb_pos,'\n');
 
-    /* Nothing to do without a \r\n */
+    /* Nothing to do without a \r\n
+     * 没有回车换行符就无事可做。
+     * */
     if (newline == NULL) {
         if (sdslen(c->querybuf) - c->qb_pos > PROTO_INLINE_MAX_SIZE) {
             addReplyError(c,"Protocol error: too big inline request");
@@ -1208,7 +1210,9 @@ int processInlineBuffer(client *c) {
         return C_ERR;
     }
 
-    /* Handle the \r\n case. */
+    /* Handle the \r\n case.
+     * 处理 "\r\n" 的情况。
+     * */
     if (newline && newline != c->querybuf+c->qb_pos && *(newline-1) == '\r')
         newline--, linefeed_chars++;
 

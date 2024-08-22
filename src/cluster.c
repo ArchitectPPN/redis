@@ -4183,8 +4183,11 @@ void clusterReplyMultiBulkSlots(client *c) {
         int j = 0, start = -1;
         int i, nested_elements = 0;
 
-        /* Skip slaves (that are iterated when producing the output of their
-         * master) and  masters not serving any slot. */
+        /* Skip slaves (that are iterated when producing the output of their master)
+         * and  masters not serving any slot.
+         * 跳过从节点（这些从节点在其主节点输出结果时会被遍历），
+         * 以及没有服务任何槽位的主节点。
+         * */
         if (!nodeIsMaster(node) || node->numslots == 0) continue;
 
         for(i = 0; i < node->numslaves; i++) {
