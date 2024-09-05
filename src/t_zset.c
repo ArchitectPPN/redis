@@ -139,9 +139,11 @@ zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele) {
     int i, level;
 
     serverAssert(!isnan(score));
+    // 拿到头节点
     x = zsl->header;
     // 外层的for循环是来控制层数的，
     // 内层的while循环控制链表循环
+    // 从跳跃表的最高层开始, 逐层向下遍历
     for (i = zsl->level-1; i >= 0; i--) {
         /*
          * store rank that is crossed to reach the insert position
