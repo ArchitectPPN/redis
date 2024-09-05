@@ -190,6 +190,9 @@
 #include "endianconv.h"
 #include "redisassert.h"
 
+/**
+ * 0xff（或二进制 11111111）经常被用作结尾标记，尤其是在数据传输或者文件格式中，因为它是一个很容易识别的全1比特模式。
+ * */
 #define ZIP_END 255         /* Special "end of ziplist" entry. */
 #define ZIP_BIG_PREVLEN 254 /* Max number of bytes of the previous entry, for
                                the "prevlen" field prefixing each entry, to be
@@ -199,23 +202,37 @@
                                representing the previous entry len. */
 
 /* Different encoding/length possibilities */
-#define ZIP_STR_MASK 0xc0
-#define ZIP_INT_MASK 0x30
-#define ZIP_STR_06B (0 << 6)
-#define ZIP_STR_14B (1 << 6)
-#define ZIP_STR_32B (2 << 6)
-#define ZIP_INT_16B (0xc0 | 0<<4)
-#define ZIP_INT_32B (0xc0 | 1<<4)
-#define ZIP_INT_64B (0xc0 | 2<<4)
-#define ZIP_INT_24B (0xc0 | 3<<4)
-#define ZIP_INT_8B 0xfe
+#define ZIP_STR_MASK 0xc0           // 该宏定义 ZIP_STR_MASK 的值为十六进制数 0xc0，即二进制 11000000。
+#define ZIP_INT_MASK 0x30           // 0x30 是一个十六进制数，其十进制值为 48。在二进制表示中，0x30 为 00110000。
+
+#define ZIP_STR_06B (0 << 6)        // 通过将0左移6位得到的结果是0   0000 0000
+#define ZIP_STR_14B (1 << 6)        // 通过将1左移6位得到的结果是64  0100 0000
+#define ZIP_STR_32B (2 << 6)        // 通过将2左移6位得到的结果是128 1000 0000
+
+#define ZIP_INT_16B (0xc0 | 0<<4)   // 0xc0 在二进制中为 1100 0000
+                                    // 0 << 4 为       0000 0000
+                                    // 结果为:          1100 0000
+
+#define ZIP_INT_32B (0xc0 | 1<<4)   // 0xc0 在二进制中为 1100 0000
+                                    // 1 << 4 为       0001 0000
+                                    // 结果为:          1101 0000
+
+#define ZIP_INT_64B (0xc0 | 2<<4)   // 0xc0 在二进制中为 1100 0000
+                                    // 2 << 4 为       0010 0000
+                                    // 结果为:          1110 0000
+
+#define ZIP_INT_24B (0xc0 | 3<<4)   // 0xc0 在二进制中为 1100 0000
+                                    // 3 << 4 为       0011 0000
+                                    // 结果为:          1111 0000
+
+#define ZIP_INT_8B 0xfe             // 0xfe 在二进制中为 1111 1110
 
 /* 4 bit integer immediate encoding |1111xxxx| with xxxx between
  * 0001 and 1101. */
 #define ZIP_INT_IMM_MASK 0x0f   /* Mask to extract the 4 bits value. To add
                                    one is needed to reconstruct the value. */
-#define ZIP_INT_IMM_MIN 0xf1    /* 11110001 */
-#define ZIP_INT_IMM_MAX 0xfd    /* 11111101 */
+#define ZIP_INT_IMM_MIN 0xf1    /* 1111 0001 */
+#define ZIP_INT_IMM_MAX 0xfd    /* 1111 1101 */
 
 #define INT24_MAX 0x7fffff
 #define INT24_MIN (-INT24_MAX - 1)
