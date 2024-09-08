@@ -193,16 +193,25 @@
 /**
  * 0xff（或二进制 11111111）经常被用作结尾标记，尤其是在数据传输或者文件格式中，因为它是一个很容易识别的全1比特模式。
  * */
-#define ZIP_END 255         /* Special "end of ziplist" entry. */
-#define ZIP_BIG_PREVLEN 254 /* Max number of bytes of the previous entry, for
-                               the "prevlen" field prefixing each entry, to be
-                               represented with just a single byte. Otherwise
-                               it is represented as FF AA BB CC DD, where
-                               AA BB CC DD are a 4 bytes unsigned integer
-                               representing the previous entry len. */
+/*
+* Special "end of ziplist" entry.
+* 特殊的“压缩列表结束”条目。
+* */
+#define ZIP_END 255
 
-/* Different encoding/length possibilities */
-#define ZIP_STR_MASK 0xc0           // 该宏定义 ZIP_STR_MASK 的值为十六进制数 0xc0，即二进制 11000000。
+/*
+* Max number of bytes of the previous entry, for the "prevlen" field prefixing each entry, to be represented with just a single byte.
+* 前一个条目的最大字节数，用于每个条目前缀的“prevlen”字段。如果这个值可以用一个字节表示，则使用单个字节表示。
+* Otherwise it is represented as FF AA BB CC DD, where AA BB CC DD are a 4 bytes unsigned integer representing the previous entry len.
+* 否则，使用 FF AA BB CC DD 格式表示，其中 AA BB CC DD 是一个 4 字节无符号整数，表示前一个条目的长度。
+*/
+#define ZIP_BIG_PREVLEN 254
+
+/*
+* Different encoding/length possibilities
+* 不同的编码/长度可能性。
+* */
+#define ZIP_STR_MASK 0xc0           // 该宏定义 ZIP_STR_MASK 的值为十六进制数 0xc0，即二进制        11000000。
 #define ZIP_INT_MASK 0x30           // 0x30 是一个十六进制数，其十进制值为 48。在二进制表示中，0x30 为 00110000。
 
 #define ZIP_STR_06B (0 << 6)        // 通过将0左移6位得到的结果是0   0000 0000
@@ -227,18 +236,41 @@
 
 #define ZIP_INT_8B 0xfe             // 0xfe 在二进制中为 1111 1110
 
-/* 4 bit integer immediate encoding |1111xxxx| with xxxx between
- * 0001 and 1101. */
-#define ZIP_INT_IMM_MASK 0x0f   /* Mask to extract the 4 bits value. To add
-                                   one is needed to reconstruct the value. */
+/*
+* 4 bit integer immediate encoding |1111xxxx| with xxxx between 0001 and 1101.
+* 4 位整数立即数编码 |1111xxxx|，其中 xxxx 在 0001 到 1101 之间。
+* 4位bit可以表示0-15，但是不知道为什么在这里表示0001 到 1101之间？ 可能0000 和 1110 1111有其他的特殊作用
+* 0x0f 使用二进制表示即 00001111
+* */
+#define ZIP_INT_IMM_MASK 0x0f   /* Mask to extract the 4 bits value. To add one is needed to reconstruct the value.
+                                 * 掩码用于提取 4 位值。需要加一以重建该值。
+                                 *
+                                 * 这里举一个例子说明  ZIP_INT_IMM_MASK 的作用:
+                                 * 0x0f 使用二进制表示即 00001111
+                                 * // 假设有一个值 1111xxxx
+                                 * uint8_t value = 0xF1;  // 二进制表示为 11110001
+                                 * // 提取低 4 位
+                                 * // 0xF1 & 0x0f = 11110001 & 00001111 = 0x01 = 00000001
+                                 * uint8_t extracted_value = value & ZIP_INT_IMM_MASK;  //  结果为 0x01
+                                 * // 加一以重建最终值
+                                 * uint8_t final_value = extracted_value + 1;  // 结果为 0x02
+                                 * 0x01 + 1 = 0x02
+                                 **/
+/* 立即编码的最小值 */
 #define ZIP_INT_IMM_MIN 0xf1    /* 1111 0001 */
+/* 立即编码的最大值 */
 #define ZIP_INT_IMM_MAX 0xfd    /* 1111 1101 */
 
+/* 24位能表示的最大值： 0111 1111 1111 1111 1111 1111 */
 #define INT24_MAX 0x7fffff
+/* 24位能表示的最小值 */
 #define INT24_MIN (-INT24_MAX - 1)
 
-/* Macro to determine if the entry is a string. String entries never start
- * with "11" as most significant bits of the first byte. */
+/* Macro to determine if the entry is a string.
+ * 宏用于判断条目是否为字符串。
+ * String entries never start with "11" as most significant bits of the first byte.
+ * 字符串条目从第一个字节的最高有效位（most significant bits）从来不会以 “11” 开头。
+ * */
 #define ZIP_IS_STR(enc) (((enc) & ZIP_STR_MASK) < ZIP_STR_MASK)
 
 /* Utility macros.*/
@@ -253,19 +285,35 @@
  * determined without scanning the whole ziplist. */
 #define ZIPLIST_LENGTH(zl)      (*((uint16_t*)((zl)+sizeof(uint32_t)*2)))
 
-/* The size of a ziplist header: two 32 bit integers for the total
- * bytes count and last item offset. One 16 bit integer for the number
- * of items field. */
+/*
+ * The size of a ziplist header:
+ * 压缩列表（ziplist）头的大小：
+ * two 32 bit integers for the total bytes count and last item offset.
+ * 两个 32 位整数，分别用于存储总字节数和最后一个项的偏移量。
+ * One 16 bit integer for the number of items field.
+ * 一个 16 位整数，用于存储项数字段。
+ * */
 #define ZIPLIST_HEADER_SIZE     (sizeof(uint32_t)*2+sizeof(uint16_t))
 
-/* Size of the "end of ziplist" entry. Just one byte. */
+/*
+* Size of the "end of ziplist" entry.
+* 压缩列表（ziplist）结束项的大小：
+* Just one byte.
+* 仅一个字节。
+* */
 #define ZIPLIST_END_SIZE        (sizeof(uint8_t))
 
-/* Return the pointer to the first entry of a ziplist. */
+/*
+* Return the pointer to the first entry of a ziplist.
+* 返回指向压缩列表（ziplist）第一个条目的指针。
+* */
 #define ZIPLIST_ENTRY_HEAD(zl)  ((zl)+ZIPLIST_HEADER_SIZE)
 
-/* Return the pointer to the last entry of a ziplist, using the
- * last entry offset inside the ziplist header. */
+/* Return the pointer to the last entry of a ziplist,
+ * 返回指向压缩列表（ziplist）最后一个条目的指针。
+ * using the last entry offset inside the ziplist header.
+ * 使用压缩列表（ziplist）头部中的最后一个条目偏移量，返回指向压缩列表最后一个条目的指针。
+ * */
 #define ZIPLIST_ENTRY_TAIL(zl)  ((zl)+intrev32ifbe(ZIPLIST_TAIL_OFFSET(zl)))
 
 /* Return the pointer to the last byte of a ziplist, which is, the
