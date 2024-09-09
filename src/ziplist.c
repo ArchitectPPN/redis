@@ -531,7 +531,9 @@ int zipTryEncoding(unsigned char *entry, unsigned int entrylen, long long *v, un
     return 0;
 }
 
-/* Store integer 'value' at 'p', encoded as 'encoding' */
+/* Store integer 'value' at 'p', encoded as 'encoding'
+ * 将一个整数值按照指定的编码方式存储到指针 p 所指向的内存位置
+ * */
 void zipSaveInteger(unsigned char *p, int64_t value, unsigned char encoding) {
     int16_t i16;
     int32_t i32;
