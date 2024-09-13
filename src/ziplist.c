@@ -476,6 +476,7 @@ unsigned int zipStoreEntryEncoding(unsigned char *p, unsigned char encoding, uns
         } else {
             len += 4;
             if (!p) return len;
+            // 0xff（或二进制 1111 1111）
             buf[0] = ZIP_STR_32B;
             buf[1] = (rawlen >> 24) & 0xff;
             buf[2] = (rawlen >> 16) & 0xff;
