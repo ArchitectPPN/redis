@@ -346,8 +346,9 @@ int ll2string(char *dst, size_t dstlen, long long svalue) {
 }
 
 /* Convert a string into a long long. Returns 1 if the string could be parsed
- * into a (non-overflowing) long long, 0 otherwise. The value will be set to
- * the parsed value when appropriate.
+ * into a (non-overflowing) long long, 0 otherwise.
+ * The value will be set to the parsed value when appropriate.
+ * 当合适时，值将被设置为解析后的值。
  *
  * Note that this function demands that the string strictly represents
  * a long long: no spaces or other characters before or after the string
@@ -373,31 +374,65 @@ int string2ll(const char *s, size_t slen, long long *value) {
         return 1;
     }
 
-    /* Handle negative numbers: just set a flag and continue like if it
-     * was a positive number. Later convert into negative. */
+    /* Handle negative numbers: just set a flag and continue like if it was a positive number.
+     * 处理负数：只需设置一个标志并继续像处理正数一样进行。
+     * Later convert into negative.
+     * 稍后将其转换为负数。
+     * */
     if (p[0] == '-') {
+        // 第一个字符是负号, 认为这是一个负数, 指针向后移动一位, plen长度加1
         negative = 1;
         p++; plen++;
 
-        /* Abort on only a negative sign. */
+        /* Abort on only a negative sign.
+         * 只有一个负号时终止
+         * */
         if (plen == slen)
             return 0;
     }
 
-    /* First digit should be 1-9, otherwise the string should just be 0. */
+    /*
+     * First digit should be 1-9, otherwise the string should just be 0.
+     * 第一个数字应该是1-9，否则字符串应该只是0。
+     * */
     if (p[0] >= '1' && p[0] <= '9') {
+        /**
+         * p[0]-'0' 这段怎么解释呢?
+         * 答: 在 C 语言中，字符是以其对应的 ASCII 值存储的。ASCII（美国标准信息交换码）为每个字符分配了一个唯一的整数值。例如：
+         *  '0' 的 ASCII 值是 48
+         *  '1' 的 ASCII 值是 49
+         *  ...
+         *  '9' 的 ASCII 值是 57
+         *  当你有一个表示数字的字符（例如 '9'），你可能需要将其转换为实际的整数值（例如 9）。这是通过减去字符 '0' 来实现的：
+         *  具体来说：
+         *  字符 '9' 的 ASCII 值 是 57。
+         *  字符 '0' 的 ASCII 值 是 48。
+         *  '9' - '0' 计算结果 是 57 - 48 = 9。
+         *  这是一种常见的方法，用于将单个数字字符转换为其对应的整数值。这种方法的好处是简单且高效，不需要使用像 atoi 或 strtol 这样的函数来进行转换。
+         * */
         v = p[0]-'0';
         p++; plen++;
     } else {
         return 0;
     }
 
-    /* Parse all the other digits, checking for overflow at every step. */
+    /* Parse all the other digits, checking for overflow at every step.
+     * 循环解析其他数字，在每一步检查是否溢出。
+     * */
     while (plen < slen && p[0] >= '0' && p[0] <= '9') {
+        // v 大于 ULLONG_MAX/10, 那么再往后计算,就一定会溢出, 所以返回0
+        // 假设 ULLONG_MAX 最大为1000, 当前 v 为 900,
+        // (ULLONG_MAX / 10) 为 100,  900 > 100, 再往后计算,就一定会溢出, 所以返回0
         if (v > (ULLONG_MAX / 10)) /* Overflow. */
             return 0;
         v *= 10;
 
+        /* 举个例子:
+         * 假设 ULLONG_MAX 为10,  (p[0]-'0') 为 4,
+         * 那么 (ULLONG_MAX - (p[0]-'0')) 最大就只能为 6,
+         * 如果v>6, 比如是7, 那么 7 + 4 = 11 , 就一定大于 ULLONG_MAX.
+         * 这样就会存在溢出的风险.
+         * */
         if (v > (ULLONG_MAX - (p[0]-'0'))) /* Overflow. */
             return 0;
         v += p[0]-'0';
@@ -412,6 +447,43 @@ int string2ll(const char *s, size_t slen, long long *value) {
     /* Convert to negative if needed, and do the final overflow check when
      * converting from unsigned long long to long long. */
     if (negative) {
+        /**
+         *  这段代码用于检测负数转换时是否会发生溢出。让我们逐步解析这一行代码的含义：
+         *  LLONG_MIN 的含义: LLONG_MIN 是 long long 类型的最小值，通常为 -9223372036854775808（即 -2^63）。
+         *  在两补数表示法中，long long 类型可以表示的范围是从 -2^63 到 2^63 - 1。
+         *
+         *  为什么需要进行溢出检查:
+         *  当处理负数时，最小值 LLONG_MIN 的绝对值 2^63 无法 用 long long 类型的正数来表示，因为 long long 的最大正数是 2^63 - 1。
+         *  因此，如果要转换的字符串表示的负数绝对值超过 2^63，就会发生溢出。
+         *  具体的溢出检查逻辑:
+         *
+         *  计算最大允许的绝对值: (unsigned long long)(-(LLONG_MIN + 1)) + 1
+         *  首先，计算 LLONG_MIN + 1，即 -9223372036854775808 + 1 = -9223372036854775807。
+         *  然后取负数，-(-9223372036854775807) = 9223372036854775807。
+         *  最后，加上 1，得到 9223372036854775808，这正是 LLONG_MIN 的绝对值。
+         *  比较当前值 v 是否超过最大允许的绝对值:
+         *
+         *
+         *  if (v > 9223372036854775808) return 0;
+         *  如果 v（即待转换的数字的绝对值）大于 9223372036854775808，则意味着在将其转换为负数时会超过 long long 类型能表示的范围，从而发生溢出。
+         *  此时，函数返回 0，表示转换失败。
+         *
+         *  为什么这样实现
+         *  1. 确保安全性: 通过这个检查，函数可以避免在转换过程中因为溢出而导致未定义行为或错误的数值结果。
+         *  2. 处理特殊情况: LLONG_MIN 的绝对值 2^63 是一个特殊情况，因为它无法被正数 long long 类型所表示。因此，必须单独处理以确保正确性。
+         *
+         *  假设你要转换的字符串是 "-9223372036854775808"：
+         *  举例说明:
+         *
+         *  1. 解析负号: 检测到负号，将 negative 标志设为 1，并开始解析数字部分。
+         *  2. 解析数字并累加到 v 中: 逐个字符转换为数字，并累加到 v。 最终，v 会等于 9223372036854775808。
+         *  3. 进行溢出检查: 检查 v > 9223372036854775808，此时 v == 9223372036854775808，不超过，因此转换成功。
+         *  4. 如果字符串是 "-9223372036854775809"：
+         *  4.1 解析负号和数字部分: 最终，v 会等于 9223372036854775809。
+         *  4.2 进行溢出检查:
+         *  4.2.1 检查 v > 9223372036854775808，此时 v == 9223372036854775809，超过了允许的最大绝对值。
+         *  4.2.2 因此，函数返回 0，表示转换失败。
+         */
         if (v > ((unsigned long long)(-(LLONG_MIN+1))+1)) /* Overflow. */
             return 0;
         if (value != NULL) *value = -v;
