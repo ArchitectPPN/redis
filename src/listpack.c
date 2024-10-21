@@ -206,8 +206,11 @@ int lpStringToInt64(const char *s, unsigned long slen, int64_t *value) {
 unsigned char *lpNew(void) {
     unsigned char *lp = lp_malloc(LP_HDR_SIZE+1);
     if (lp == NULL) return NULL;
+    // 设置总字节长度
     lpSetTotalBytes(lp,LP_HDR_SIZE+1);
+    // 设置元素个数
     lpSetNumElements(lp,0);
+    // 设置最后一个字节为EOF, 也就是设置结束标记
     lp[LP_HDR_SIZE] = LP_EOF;
     return lp;
 }

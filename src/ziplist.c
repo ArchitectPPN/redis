@@ -940,8 +940,11 @@ unsigned char *__ziplistInsert(unsigned char *zl, unsigned char *p, unsigned cha
          * */
         reqlen = zipIntSize(encoding);
     } else {
-        /* 'encoding' is untouched, however zipStoreEntryEncoding will use the
-         * string length to figure out how to encode it. */
+        /* encoding' is untouched,
+         * encoding 保持不变，
+         * however zipStoreEntryEncoding will use the string length to figure out how to encode it.
+         * 然而，zipStoreEntryEncoding 会使用字符串长度来确定如何进行编码。
+         * */
         reqlen = slen;
     }
     /* We need space for both the length of the previous entry and the length of the payload.
@@ -950,9 +953,11 @@ unsigned char *__ziplistInsert(unsigned char *zl, unsigned char *p, unsigned cha
     reqlen += zipStorePrevEntryLength(NULL,prevlen);
     reqlen += zipStoreEntryEncoding(NULL,encoding,slen);
 
-    /* When the insert position is not equal to the tail, we need to
-     * make sure that the next entry can hold this entry's length in
-     * its prevlen field. */
+    /* When the insert position is not equal to the tail,
+     * 当插入位置不等于尾部时，
+     * we need to make sure that the next entry can hold this entry's length in its prevlen field.
+     * 我们需要确保下一个条目可以在其 prevlen 字段中容纳当前条目的长度。
+     * */
     int forcelarge = 0;
     nextdiff = (p[0] != ZIP_END) ? zipPrevLenByteDiff(p,reqlen) : 0;
     if (nextdiff == -4 && reqlen < 4) {
@@ -960,41 +965,77 @@ unsigned char *__ziplistInsert(unsigned char *zl, unsigned char *p, unsigned cha
         forcelarge = 1;
     }
 
-    /* Store offset because a realloc may change the address of zl. */
+    /*
+     * Store offset because a realloc may change the address of zl.
+     * 存储偏移量，因为 realloc 可能会改变 zl 的地址。
+     *
+     * 指针运算允许你在指针之间进行算术运算，例如加法和减法。这些运算基于指针所指向的数据类型的大小进行。
+     * 加法 (+): 向前移动指针。
+     * 减法 (-): 向后移动指针或计算两个指针之间的距离。
+     * 重要的是，指针运算只能在同一个数组或内存块内进行，否则结果是未定义的。
+     *
+     * 假设 p 和 zl 都是指向同一个字符数组或字符串的指针，表达式 p - zl 计算的是 两个指针之间的元素（字符）数量。
+     * 这个结果通常用来表示当前指针 p 相对于起始指针 zl 的偏移量。
+     *
+     * 示例解析：
+     * const char *zl = "Hello, World!";
+     * const char *p = zl + 7; // p 指向字符串中的 'W'
+     * long offset = p - zl;
+     * printf("Offset: %ld\n", offset); // 输出 Offset: 7
+     * */
     offset = p-zl;
+    // 重新调整 zl 的大小
     zl = ziplistResize(zl,curlen+reqlen+nextdiff);
+    // 获取插入位置的指针
     p = zl+offset;
 
-    /* Apply memory move when necessary and update tail offset. */
+    /* Apply memory move when necessary and update tail offset.
+     * 在必要时应用内存移动并更新尾部偏移。
+     * */
+    // 插入位置不是尾部，需要移动内存
     if (p[0] != ZIP_END) {
-        /* Subtract one because of the ZIP_END bytes */
+        /* Subtract one because of the ZIP_END bytes
+         * 减去一，因为有 ZIP_END 字节。
+         * */
         memmove(p+reqlen,p-nextdiff,curlen-offset-1+nextdiff);
 
-        /* Encode this entry's raw length in the next entry. */
+        /* Encode this entry's raw length in the next entry.
+         * 在下一个条目中编码当前条目的原始长度。
+         * */
         if (forcelarge)
             zipStorePrevEntryLengthLarge(p+reqlen,reqlen);
         else
             zipStorePrevEntryLength(p+reqlen,reqlen);
 
-        /* Update offset for tail */
+        /* Update offset for tail
+         * 更新尾部的偏移量
+         * */
         ZIPLIST_TAIL_OFFSET(zl) =
             intrev32ifbe(intrev32ifbe(ZIPLIST_TAIL_OFFSET(zl))+reqlen);
 
         /* When the tail contains more than one entry, we need to take
          * "nextdiff" in account as well. Otherwise, a change in the
-         * size of prevlen doesn't have an effect on the *tail* offset. */
+         * size of prevlen doesn't have an effect on the *tail* offset.
+         * 当尾部包含多个条目时，我们需要考虑 "nextdiff"。 否则， prevlen 的大小更改对 * 尾部 * 的偏移量没有影响。*/
         zipEntry(p+reqlen, &tail);
         if (p[reqlen+tail.headersize+tail.len] != ZIP_END) {
             ZIPLIST_TAIL_OFFSET(zl) =
                 intrev32ifbe(intrev32ifbe(ZIPLIST_TAIL_OFFSET(zl))+nextdiff);
         }
     } else {
-        /* This element will be the new tail. */
+        /* This element will be the new tail.
+         * 这个元素将成为新的尾部。
+         * */
         ZIPLIST_TAIL_OFFSET(zl) = intrev32ifbe(p-zl);
     }
 
-    /* When nextdiff != 0, the raw length of the next entry has changed, so
-     * we need to cascade the update throughout the ziplist */
+    /* When nextdiff != 0,
+     * 当 nextdiff != 0 时，
+     * the raw length of the next entry has changed,
+     * 下一个条目的原始长度发生了变化，
+     * so we need to cascade the update throughout the ziplist
+     * 因此我们需要在整个链表中级联更新。
+     * */
     if (nextdiff != 0) {
         offset = p-zl;
         zl = __ziplistCascadeUpdate(zl,p+reqlen);
