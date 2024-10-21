@@ -601,32 +601,42 @@ unsigned char *lpInsert(unsigned char *lp, unsigned char *ele, uint32_t size, un
 
     uint64_t enclen; /* The length of the encoded element. */
 
-    /* An element pointer set to NULL means deletion, which is conceptually
-     * replacing the element with a zero-length element. So whatever we
-     * get passed as 'where', set it to LP_REPLACE. */
+    /* An element pointer set to NULL means deletion,
+     * 将元素指针设置为 NULL 表示删除，
+     * which is conceptually replacing the element with a zero-length element.
+     * 这在概念上相当于用一个零长度的元素替换该元素。
+     * So whatever we get passed as 'where', set it to LP_REPLACE.
+     * 因此，无论我们接收到的 'where' 是什么，都将其设置为 LP_REPLACE。
+     * */
     if (ele == NULL) where = LP_REPLACE;
 
-    /* If we need to insert after the current element, we just jump to the
-     * next element (that could be the EOF one) and handle the case of
-     * inserting before. So the function will actually deal with just two
-     * cases: LP_BEFORE and LP_REPLACE. */
+    /* If we need to insert after the current element,
+     * 如果我们需要在当前元素之后插入，
+     * we just jump to the next element (that could be the EOF one) and handle the case of inserting before.
+     * 我们只需跳到下一个元素（可能是文件末尾的元素），然后处理在该元素之前插入的情况。
+     * So the function will actually deal with just two cases: LP_BEFORE and LP_REPLACE.
+     * 因此，函数实际上只需要处理两种情况：LP_BEFORE 和 LP_REPLACE。
+     * */
     if (where == LP_AFTER) {
         p = lpSkip(p);
         where = LP_BEFORE;
     }
 
-    /* Store the offset of the element 'p', so that we can obtain its
-     * address again after a reallocation. */
+    /* Store the offset of the element 'p',
+     * 存储元素 'p' 的偏移量，
+     * so that we can obtain its address again after a reallocation.
+     * 这样我们在重新分配内存后可以再次获取其地址。
+     * */
     unsigned long poff = p-lp;
 
-    /* Calling lpEncodeGetType() results into the encoded version of the
-     * element to be stored into 'intenc' in case it is representable as
-     * an integer: in that case, the function returns LP_ENCODING_INT.
-     * Otherwise if LP_ENCODING_STR is returned, we'll have to call
-     * lpEncodeString() to actually write the encoded string on place later.
+    /* Calling lpEncodeGetType() results into the encoded version of the element to be stored into 'intenc' in case it is representable as an integer: in that case, the function returns LP_ENCODING_INT.
+     * 调用 lpEncodeGetType() 会将元素的编码版本存储到 intenc 中, 前提是该元素可以表示为整数：在这种情况下，函数返回 LP_ENCODING_INT。
+     * Otherwise if LP_ENCODING_STR is returned, we'll have to call lpEncodeString() to actually write the encoded string on place later.
+     * 否则，如果返回 LP_ENCODING_STR，则我们需要调用 lpEncodeString() 来实际写入编码后的字符串。
      *
-     * Whatever the returned encoding is, 'enclen' is populated with the
-     * length of the encoded element. */
+     * Whatever the returned encoding is, 'enclen' is populated with the length of the encoded element.
+     * 无论返回的编码是什么，enclen 都会被填充为编码后元素的长度。
+     * */
     int enctype;
     if (ele) {
         enctype = lpEncodeGetType(ele,size,intenc,&enclen);
@@ -635,9 +645,11 @@ unsigned char *lpInsert(unsigned char *lp, unsigned char *ele, uint32_t size, un
         enclen = 0;
     }
 
-    /* We need to also encode the backward-parsable length of the element
-     * and append it to the end: this allows to traverse the listpack from
-     * the end to the start. */
+    /* We need to also encode the backward-parsable length of the element and append it to the end:
+     * 我们还需要对元素的可逆解析长度进行编码，并将其附加到末尾：
+     * this allows to traverse the listpack from the end to the start.
+     * 这允许从列表的末尾向前遍历。
+     * */
     unsigned long backlen_size = ele ? lpEncodeBacklen(backlen,enclen) : 0;
     uint64_t old_listpack_bytes = lpGetTotalBytes(lp);
     uint32_t replaced_len  = 0;
@@ -650,22 +662,30 @@ unsigned char *lpInsert(unsigned char *lp, unsigned char *ele, uint32_t size, un
                                   - replaced_len;
     if (new_listpack_bytes > UINT32_MAX) return NULL;
 
-    /* We now need to reallocate in order to make space or shrink the
-     * allocation (in case 'when' value is LP_REPLACE and the new element is
-     * smaller). However we do that before memmoving the memory to
-     * make room for the new element if the final allocation will get
-     * larger, or we do it after if the final allocation will get smaller. */
+    /* We now need to reallocate in order to make space or shrink the allocation (in case 'when' value is LP_REPLACE and the new element is smaller).
+     * 我们现在需要重新分配内存以腾出空间或缩小分配（如果 'when' 值为 LP_REPLACE 且新元素较小）。
+     * However we do that before memmoving the memory to make room for the new element if the final allocation will get larger,
+     * 然而，如果最终分配会变大，我们在移动内存以腾出新元素的空间之前进行重新分配；
+     * or we do it after if the final allocation will get smaller.
+     * 如果最终分配会变小，则在移动内存之后进行重新分配。
+     * */
 
-    unsigned char *dst = lp + poff; /* May be updated after reallocation. */
+    /* May be updated after reallocation.
+     * 可能在重新分配后更新。
+     * */
+    unsigned char *dst = lp + poff;
 
-    /* Realloc before: we need more room. */
+    /* Realloc before: we need more room.
+     * 重新分配前：我们需要更多的空间。
+     * */
     if (new_listpack_bytes > old_listpack_bytes) {
         if ((lp = lp_realloc(lp,new_listpack_bytes)) == NULL) return NULL;
         dst = lp + poff;
     }
 
-    /* Setup the listpack relocating the elements to make the exact room
-     * we need to store the new one. */
+    /* Setup the listpack relocating the elements to make the exact room we need to store the new one.
+     * 设置listpack，重新定位元素以腾出恰好我们需要的空间来存储新元素。
+     * */
     if (where == LP_BEFORE) {
         memmove(dst+enclen+backlen_size,dst,old_listpack_bytes-poff);
     } else { /* LP_REPLACE. */
@@ -681,11 +701,14 @@ unsigned char *lpInsert(unsigned char *lp, unsigned char *ele, uint32_t size, un
         dst = lp + poff;
     }
 
-    /* Store the entry. */
+    /* Store the entry.
+     * 存储entry
+     * */
     if (newp) {
         *newp = dst;
-        /* In case of deletion, set 'newp' to NULL if the next element is
-         * the EOF element. */
+        /* In case of deletion, set 'newp' to NULL if the next element is the EOF element.
+         * 在删除的情况下，如果下一个元素是文件末尾（EOF）元素，则将 'newp' 设置为 NULL。
+         * */
         if (!ele && dst[0] == LP_EOF) *newp = NULL;
     }
     if (ele) {
@@ -712,12 +735,17 @@ unsigned char *lpInsert(unsigned char *lp, unsigned char *ele, uint32_t size, un
     lpSetTotalBytes(lp,new_listpack_bytes);
 
 #if 0
-    /* This code path is normally disabled: what it does is to force listpack
-     * to return *always* a new pointer after performing some modification to
-     * the listpack, even if the previous allocation was enough. This is useful
-     * in order to spot bugs in code using listpacks: by doing so we can find
-     * if the caller forgets to set the new pointer where the listpack reference
-     * is stored, after an update. */
+    /* This code path is normally disabled:
+     * 这段代码路径通常被禁用：
+     * what it does is to force listpack to return *always* a new pointer after performing some modification to the listpack,
+     * 它的作用是强制列表包在对其进行了某些修改后 总是 返回一个新的指针,
+     * even if the previous allocation was enough.
+     * 即使之前的分配已经足够。
+     * This is useful in order to spot bugs in code using listpacks:
+     * 这有助于发现使用列表包的代码中的错误：
+     * by doing so we can find if the caller forgets to set the new pointer where the listpack reference is stored, after an update.
+     * 通过这样做，我们可以检查调用者是否在更新后忘记将新的指针设置到存储列表包引用的位置。
+     * */
     unsigned char *oldlp = lp;
     lp = lp_malloc(new_listpack_bytes);
     memcpy(lp,oldlp,new_listpack_bytes);
