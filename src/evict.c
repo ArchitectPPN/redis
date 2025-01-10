@@ -297,6 +297,14 @@ void evictionPoolPopulate(int dbid, dict *sampledict, dict *keydict, struct evic
  * 16 bits. The returned time is suitable to be stored as LDT (last decrement
  * time) for the LFU implementation. */
 unsigned long LFUGetTimeInMinutes(void) {
+    // (server.unixtime/60) 这个得到自1970年1月1日00:00:00 UTC开始过了多少分钟, 如果 server.unixtime 是1622532000秒，那么 1622532000 / 60 等于27042200分钟。
+    // (server.unixtime / 60) & 65535 确保结果不超过16位无符号整数的最大值（65535）。
+    // 我们假设 (server.unixtime/60) 的结果为1, 那么返回值就是 1 & 65535 = 1。
+    // (server.unixtime/60) 结果为2, 那么返回值就是 2 & 65535 = 2。
+    // .....
+    // (server.unixtime/60) 结果为65535, 那么返回值就是 65535 & 65535 = 65535。
+    // (server.unixtime/60) 结果为65536, 那么返回值就是 65536 & 65535 = 0。
+    // 也就说这里随着时间继续走，这个值会不断变化。变化的范围就是在0到65535之间。
     return (server.unixtime/60) & 65535;
 }
 
@@ -305,8 +313,15 @@ unsigned long LFUGetTimeInMinutes(void) {
  * the current 16 bits minutes time) considering the time as wrapping
  * exactly once. */
 unsigned long LFUTimeElapsed(unsigned long ldt) {
+    // 拿到过了多少分钟
     unsigned long now = LFUGetTimeInMinutes();
+
+    // now-ldt 表示距上次访问过了多少分钟
     if (now >= ldt) return now-ldt;
+
+    // ldt 为 4000, now为0;
+    // 如果当前时间比上次访问时间小，说明上次访问时间已经跨了一圈了，那么就返回当前时间加上（当前时间-上次访问时间）
+    // 65535-4000 = 61535;
     return 65535-ldt+now;
 }
 
@@ -333,8 +348,11 @@ uint8_t LFULogIncr(uint8_t counter) {
  * to fit: as we check for the candidate, we incrementally decrement the
  * counter of the scanned objects if needed. */
 unsigned long LFUDecrAndReturn(robj *o) {
+    // 右移8位,得到时间
     unsigned long ldt = o->lru >> 8;
+    // & 255 通过按位与操作提取出低8位的计数器部分
     unsigned long counter = o->lru & 255;
+    // 开始计算衰减周期
     unsigned long num_periods = server.lfu_decay_time ? LFUTimeElapsed(ldt) / server.lfu_decay_time : 0;
     if (num_periods)
         counter = (num_periods > counter) ? 0 : counter - num_periods;

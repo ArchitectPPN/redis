@@ -614,6 +614,13 @@ typedef struct RedisModuleDigest {
 
 #define OBJ_SHARED_REFCOUNT INT_MAX
 typedef struct redisObject {
+    /**
+        在C语言中，unsigned type:4; 这样的语法表示一个位字段（bit field）。具体解释如下：
+        - unsigned：表示这是一个无符号整数类型。
+        - type：这是位字段的名称。
+        - :4：表示这个位字段占用4位。
+        位字段主要用于节省内存，特别是在处理硬件相关的编程或需要精确控制数据结构大小的情况下。4位的无符号整数可以表示0到15之间的值。
+    */
     unsigned type:4;
     unsigned encoding:4;
     unsigned lru:LRU_BITS; /* LRU time (relative to global lru_clock) or
